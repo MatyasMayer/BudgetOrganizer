@@ -62,6 +62,55 @@ class CategoryManagementScenarioTest {
         assertEquals(TransactionType.INCOME, food.type());
     }
 
+    @Test
+    void aRenamedCategoryKeepsAllItsTransactions() {
+        long games = category("GAMES").id();
+        Transaction hades = expense(games, 600, "Steam – Hades II");
+        Transaction sale = expense(games, 400, "Summer sale");
+
+        service.renameCategory(games, "Video games");
+
+        assertEquals("Video games", category("Video games").name());
+        assertEquals(games, category("Video games").id());
+        assertEquals(List.of(sale, hades), service.transactions(TransactionFilter.ALL.inCategory(games)));
+        assertEquals(Money.ofHalere(100_000), service.categoryTotal(games, Month.of(TODAY)));
+    }
+
+    @Test
+    void aRenameIsValidatedLikeANewName() {
+        long games = category("GAMES").id();
+
+        assertEquals(InvalidCategoryException.Problem.BLANK_NAME, assertThrows(InvalidCategoryException.class,
+                () -> service.renameCategory(games, "")).problem());
+        assertEquals(InvalidCategoryException.Problem.DUPLICATE_NAME, assertThrows(InvalidCategoryException.class,
+                () -> service.renameCategory(games, "Food")).problem());
+        assertEquals("GAMES", service.categories(TransactionType.EXPENSE).get(3).name());
+    }
+
+    @Test
+    void aCategoryCanBeRenamedToADifferentCaseOfItsOwnName() {
+        long games = category("GAMES").id();
+
+        service.renameCategory(games, "Games");
+
+        assertEquals(games, category("Games").id());
+    }
+
+    @Test
+    void fromSavingsCanBeRenamedAndStaysTheSystemCategory() {
+        long fromSavings = category("FROM_SAVINGS").id();
+
+        service.renameCategory(fromSavings, "Savings withdrawal");
+
+        assertEquals(true, category("Savings withdrawal").system());
+    }
+
+    @Test
+    void renamingAnUnknownCategoryIsRejected() {
+        assertEquals(InvalidCategoryException.Problem.UNKNOWN_CATEGORY, assertThrows(InvalidCategoryException.class,
+                () -> service.renameCategory(999, "Ghost")).problem());
+    }
+
     private Transaction expense(long categoryId, long crowns, String note) {
         return service.recordTransaction(
                 new TransactionDetails(TODAY, TransactionType.EXPENSE, categoryId, Money.ofHalere(crowns * 100), note));

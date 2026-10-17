@@ -64,6 +64,17 @@ public class BudgetService {
         return categories.add(validName(name, type, OptionalLong.empty()), type, false);
     }
 
+    /** Renames a Category; its Transactions stay attached because they refer to it by id. */
+    public void renameCategory(long id, String name) {
+        Category category = existingCategory(id);
+        categories.rename(id, validName(name, category.type(), OptionalLong.of(id)));
+    }
+
+    private Category existingCategory(long id) {
+        return categories.find(id)
+                .orElseThrow(() -> new InvalidCategoryException(InvalidCategoryException.Problem.UNKNOWN_CATEGORY));
+    }
+
     /** The stripped name, if it's not blank and no other Category of the type has it (ignoring case). */
     private String validName(String name, TransactionType type, OptionalLong except) {
         String stripped = name == null ? "" : name.strip();

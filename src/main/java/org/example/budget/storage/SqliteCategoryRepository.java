@@ -70,6 +70,29 @@ public class SqliteCategoryRepository implements CategoryRepository {
         }
     }
 
+    @Override
+    public void rename(long id, String name) {
+        try (Connection connection = database.connect();
+             PreparedStatement update = connection.prepareStatement("UPDATE categories SET name = ? WHERE id = ?")) {
+            update.setString(1, name);
+            update.setLong(2, id);
+            update.executeUpdate();
+        } catch (SQLException e) {
+            throw new StorageException("Cannot rename Category " + id, e);
+        }
+    }
+
+    @Override
+    public void delete(long id) {
+        try (Connection connection = database.connect();
+             PreparedStatement delete = connection.prepareStatement("DELETE FROM categories WHERE id = ?")) {
+            delete.setLong(1, id);
+            delete.executeUpdate();
+        } catch (SQLException e) {
+            throw new StorageException("Cannot delete Category " + id, e);
+        }
+    }
+
     private static Category read(ResultSet row) throws SQLException {
         return new Category(
                 row.getLong("id"),

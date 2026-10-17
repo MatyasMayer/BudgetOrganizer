@@ -6,7 +6,8 @@ public class InvalidCategoryException extends RuntimeException {
     public enum Problem {
         BLANK_NAME,
         /** Another Category of the same type already has this name (ignoring case). */
-        DUPLICATE_NAME
+        DUPLICATE_NAME,
+        UNKNOWN_CATEGORY
     }
 
     private final Problem problem;
