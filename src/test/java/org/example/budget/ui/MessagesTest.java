@@ -1,5 +1,6 @@
 package org.example.budget.ui;
 
+import org.example.budget.domain.InvalidBudgetLimitException;
 import org.example.budget.domain.InvalidCategoryException;
 import org.example.budget.domain.InvalidTransactionException;
 import org.example.budget.domain.Language;
@@ -78,6 +79,15 @@ class MessagesTest {
         for (Locale locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("cs"))) {
             for (InvalidCategoryException.Problem problem : InvalidCategoryException.Problem.values()) {
                 Messages.bundle(locale).getString(Messages.categoryProblemKey(problem));
+            }
+        }
+    }
+
+    @Test
+    void everyRefusedBudgetLimitHasAMessageInBothLanguages() {
+        for (Locale locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("cs"))) {
+            for (InvalidBudgetLimitException.Problem problem : InvalidBudgetLimitException.Problem.values()) {
+                Messages.bundle(locale).getString(Messages.budgetLimitProblemKey(problem));
             }
         }
     }

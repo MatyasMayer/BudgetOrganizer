@@ -1,5 +1,6 @@
 package org.example.budget.ui;
 
+import org.example.budget.domain.InvalidBudgetLimitException;
 import org.example.budget.domain.InvalidCategoryException;
 import org.example.budget.domain.InvalidTransactionException;
 import org.example.budget.domain.Language;
@@ -56,6 +57,11 @@ public final class Messages {
     /** Bundle key of the message for a refused Category change, e.g. {@code category.error.blank-name}. */
     public static String categoryProblemKey(InvalidCategoryException.Problem problem) {
         return "category.error." + problem.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /** Bundle key of the message for a refused Budget Limit, e.g. {@code budget-limit.error.not-positive}. */
+    public static String budgetLimitProblemKey(InvalidBudgetLimitException.Problem problem) {
+        return "budget-limit.error." + problem.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 
     /** Bundle key of a Transaction type's name, e.g. {@code transaction.type.expense}. */
