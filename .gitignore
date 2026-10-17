@@ -41,3 +41,8 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+### BudgetOrganizer ###
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
