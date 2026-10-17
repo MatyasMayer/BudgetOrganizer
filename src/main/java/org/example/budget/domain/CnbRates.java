@@ -22,6 +22,11 @@ final class CnbRates {
         @Override
         public void save(LocalDate date, CnbRate rate) {
         }
+
+        @Override
+        public Optional<CnbRate> mostRecent(Currency currency) {
+            return Optional.empty();
+        }
     };
 
     private final CnbRateRepository cache;

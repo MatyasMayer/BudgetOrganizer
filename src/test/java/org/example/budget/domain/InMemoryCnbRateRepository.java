@@ -1,6 +1,7 @@
 package org.example.budget.domain;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -21,5 +22,12 @@ public class InMemoryCnbRateRepository implements CnbRateRepository {
     @Override
     public void save(LocalDate date, CnbRate rate) {
         rates.put(new Key(rate.currency(), date), rate);
+    }
+
+    @Override
+    public Optional<CnbRate> mostRecent(Currency currency) {
+        return rates.values().stream()
+                .filter(rate -> rate.currency() == currency)
+                .max(Comparator.comparing(CnbRate::validFor));
     }
 }

@@ -27,7 +27,7 @@ import java.util.Optional;
 public class SqliteTransactionRepository implements TransactionRepository {
 
     private static final String COLUMNS = "SELECT id, date, type, category_id, amount, note, original_currency,"
-            + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount FROM transactions";
+            + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount, provisional_rate FROM transactions";
 
     private final Database database;
 
@@ -40,8 +40,8 @@ public class SqliteTransactionRepository implements TransactionRepository {
         try (Connection connection = database.connect();
              PreparedStatement insert = connection.prepareStatement(
                      "INSERT INTO transactions (date, type, category_id, amount, note, original_currency,"
-                             + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount)"
-                             + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                             + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount, provisional_rate)"
+                             + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                      Statement.RETURN_GENERATED_KEYS)) {
             bind(insert, details);
             insert.executeUpdate();
@@ -73,9 +73,9 @@ public class SqliteTransactionRepository implements TransactionRepository {
              PreparedStatement update = connection.prepareStatement(
                      "UPDATE transactions SET date = ?, type = ?, category_id = ?, amount = ?, note = ?,"
                              + " original_currency = ?, original_amount = ?, cnb_rate = ?, cnb_rate_valid_for = ?,"
-                             + " charged_amount = ? WHERE id = ?")) {
+                             + " charged_amount = ?, provisional_rate = ? WHERE id = ?")) {
             bind(update, transaction.details());
-            update.setLong(11, transaction.id());
+            update.setLong(12, transaction.id());
             update.executeUpdate();
         } catch (SQLException e) {
             throw new StorageException("Cannot update Transaction " + transaction.id(), e);
@@ -183,6 +183,7 @@ public class SqliteTransactionRepository implements TransactionRepository {
         statement.setString(8, conversion.map(c -> c.cnbRate().czkPerUnit().toPlainString()).orElse(null));
         statement.setString(9, conversion.map(c -> c.cnbRate().validFor().toString()).orElse(null));
         statement.setObject(10, conversion.flatMap(Conversion::chargedAmount).map(Money::halere).orElse(null));
+        statement.setInt(11, conversion.filter(Conversion::provisionalRate).isPresent() ? 1 : 0);
     }
 
     private static Transaction read(ResultSet row) throws SQLException {
@@ -207,6 +208,7 @@ public class SqliteTransactionRepository implements TransactionRepository {
                 new OriginalAmount(currency, row.getLong("original_amount")),
                 new CnbRate(currency, LocalDate.parse(row.getString("cnb_rate_valid_for")),
                         new BigDecimal(row.getString("cnb_rate"))),
-                chargedAmount));
+                chargedAmount,
+                row.getInt("provisional_rate") == 1));
     }
 }
