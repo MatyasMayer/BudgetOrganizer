@@ -7,6 +7,9 @@ import java.util.Optional;
 @FunctionalInterface
 public interface RateSource {
 
+    /** A source that never has a rate. */
+    RateSource UNAVAILABLE = (currency, date) -> Optional.empty();
+
     /**
      * The ČNB Rate for a currency on a date. For weekends, holidays and dates without a fixing yet, that is
      * the latest earlier fixing, with its own {@link CnbRate#validFor()}. Empty when the rate can't be

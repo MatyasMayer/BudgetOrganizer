@@ -4,6 +4,7 @@ import org.example.budget.domain.InvalidTransactionException.Problem;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -17,13 +18,22 @@ public class BudgetService {
     private final CategoryRepository categories;
     private final TransactionRepository transactions;
     private final Clock clock;
+    private final CnbRates cnbRates;
 
     public BudgetService(SettingsRepository settings, CategoryRepository categories,
-                         TransactionRepository transactions, Clock clock) {
+                         TransactionRepository transactions, CnbRateRepository rateCache, RateSource rateSource,
+                         Clock clock) {
         this.settings = settings;
         this.categories = categories;
         this.transactions = transactions;
         this.clock = clock;
+        this.cnbRates = new CnbRates(rateCache, rateSource, clock);
+    }
+
+    /** A service without ČNB Rates (every rate is unavailable), for scenarios that only use CZK. */
+    public BudgetService(SettingsRepository settings, CategoryRepository categories,
+                         TransactionRepository transactions, Clock clock) {
+        this(settings, categories, transactions, CnbRates.NO_CACHE, RateSource.UNAVAILABLE, clock);
     }
 
     public Month currentMonth() {
@@ -95,6 +105,21 @@ public class BudgetService {
                 .reduce(Money.ZERO, Money::plus);
     }
 
+    // --- Foreign currency ---
+
+    /** The ČNB Rate for a currency on a date, from the cache or else from ČNB. Empty when unavailable. */
+    public Optional<CnbRate> cnbRate(Currency currency, LocalDate date) {
+        return cnbRates.rate(currency, date);
+    }
+
+    /**
+     * Converts an Original Amount with the ČNB Rate for the Transaction's date; an optional Charged Amount
+     * overrides the result. Empty when the rate is unavailable.
+     */
+    public Optional<Conversion> convert(OriginalAmount amount, LocalDate date, Optional<Money> chargedAmount) {
+        return cnbRate(amount.currency(), date).map(rate -> new Conversion(amount, rate, chargedAmount));
+    }
+
     private void validate(TransactionDetails details) {
         Category category = categories.find(details.categoryId())
                 .orElseThrow(() -> new InvalidTransactionException(Problem.UNKNOWN_CATEGORY));
@@ -102,7 +127,8 @@ public class BudgetService {
             throw new InvalidTransactionException(Problem.CATEGORY_OF_OTHER_TYPE);
         }
         long amount = details.amount().halere();
-        if (amount == 0) {
+        boolean zeroOriginalAmount = details.conversion().map(c -> c.originalAmount().cents() == 0).orElse(false);
+        if (amount == 0 || zeroOriginalAmount) {
             throw new InvalidTransactionException(Problem.ZERO_AMOUNT);
         }
         if (amount < 0 && details.type() == TransactionType.INCOME) {
