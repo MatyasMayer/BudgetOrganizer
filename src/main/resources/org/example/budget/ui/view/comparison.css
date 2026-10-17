@@ -1,0 +1,25 @@
+/* Month comparison: the compared period in the first categorical colour, the previous Month in neutral grey. */
+
+.comparison-section {
+    -fx-padding: 12 16 12 16;
+    -fx-spacing: 8;
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 6;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 6;
+}
+
+.chart-legend-item {
+    -fx-text-fill: -color-fg-default;
+}
+
+.axis {
+    -fx-tick-label-fill: -color-fg-default;
+}
+
+.default-color0.chart-bar, .bar-legend-symbol.default-color0 { -fx-bar-fill: #2a78d6; -fx-background-color: #2a78d6; }
+.default-color1.chart-bar, .bar-legend-symbol.default-color1 { -fx-bar-fill: #8a8a85; -fx-background-color: #8a8a85; }
+
+.comparison-total {
+    -fx-font-weight: bold;
+}

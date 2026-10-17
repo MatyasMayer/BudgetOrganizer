@@ -1,5 +1,6 @@
 package org.example.budget.domain;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,6 +25,9 @@ public interface TransactionRepository {
 
     /** One total per Category that has Transactions in the Month, in no particular order. */
     List<CategoryTotal> categoryTotals(Month month);
+
+    /** One total per Category that has Transactions from {@code from} through {@code through} (both included). */
+    List<CategoryTotal> categoryTotals(LocalDate from, LocalDate through);
 
     /** One entry per Month that has Transactions, oldest Month first. */
     List<MonthTotals> monthTotals();

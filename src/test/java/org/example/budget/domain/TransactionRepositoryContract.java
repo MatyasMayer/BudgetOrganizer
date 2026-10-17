@@ -288,6 +288,23 @@ public abstract class TransactionRepositoryContract {
     }
 
     @Test
+    void categoryTotalsBetweenTwoDatesIncludeBothEndDays() {
+        repository.add(expense(LocalDate.of(2026, 9, 30), food, 1, ""));
+        repository.add(expense(LocalDate.of(2026, 10, 1), food, 30_000, ""));
+        repository.add(expense(LocalDate.of(2026, 10, 10), food, -5_050, "Refund"));
+        repository.add(expense(LocalDate.of(2026, 10, 10), games, 99_900, ""));
+        repository.add(expense(LocalDate.of(2026, 10, 11), games, 2, ""));
+        repository.add(new TransactionDetails(
+                LocalDate.of(2026, 10, 5), TransactionType.INCOME, salary, Money.ofHalere(3_000_000), ""));
+
+        assertEquals(Set.of(
+                        new CategoryTotal(food, TransactionType.EXPENSE, Money.ofHalere(24_950)),
+                        new CategoryTotal(games, TransactionType.EXPENSE, Money.ofHalere(99_900)),
+                        new CategoryTotal(salary, TransactionType.INCOME, Money.ofHalere(3_000_000))),
+                Set.copyOf(repository.categoryTotals(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 10))));
+    }
+
+    @Test
     void monthTotalsSumIncomeAndExpensesPerMonthOldestFirstIncludingRefunds() {
         repository.add(expense(LocalDate.of(2026, 10, 31), food, 30_000, ""));
         repository.add(expense(LocalDate.of(2026, 10, 1), games, -5_050, "Refund"));
