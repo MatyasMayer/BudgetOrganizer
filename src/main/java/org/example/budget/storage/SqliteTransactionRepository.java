@@ -153,12 +153,17 @@ public class SqliteTransactionRepository implements TransactionRepository {
 
     @Override
     public List<CategoryTotal> categoryTotals(Month month) {
+        return categoryTotals(month.firstDay(), month.lastDay());
+    }
+
+    @Override
+    public List<CategoryTotal> categoryTotals(LocalDate from, LocalDate through) {
         try (Connection connection = database.connect();
              PreparedStatement query = connection.prepareStatement(
                      "SELECT category_id, type, SUM(amount) AS total FROM transactions"
                              + " WHERE date BETWEEN ? AND ? GROUP BY category_id, type")) {
-            query.setString(1, month.firstDay().toString());
-            query.setString(2, month.lastDay().toString());
+            query.setString(1, from.toString());
+            query.setString(2, through.toString());
             List<CategoryTotal> totals = new ArrayList<>();
             try (ResultSet result = query.executeQuery()) {
                 while (result.next()) {
@@ -169,7 +174,7 @@ public class SqliteTransactionRepository implements TransactionRepository {
             }
             return totals;
         } catch (SQLException e) {
-            throw new StorageException("Cannot total the Categories of " + month, e);
+            throw new StorageException("Cannot total the Categories from " + from + " through " + through, e);
         }
     }
 
