@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<!-- Content of the first-launch dialog; the dialog itself is built by FirstLaunchController. -->
+<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" spacing="12" prefWidth="420">
+    <padding><Insets top="8" right="8" bottom="8" left="8"/></padding>
+
+    <fx:define><ToggleGroup fx:id="languageGroup"/></fx:define>
+
+    <Label fx:id="languagePrompt" wrapText="true"/>
+    <HBox spacing="16">
+        <RadioButton fx:id="english" toggleGroup="$languageGroup"/>
+        <RadioButton fx:id="czech" toggleGroup="$languageGroup"/>
+    </HBox>
+</VBox>

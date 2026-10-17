@@ -21,4 +21,10 @@ public interface TransactionRepository {
 
     /** The Transactions matching the filter, newest date first (and newest added first within a day). */
     List<Transaction> find(TransactionFilter filter);
+
+    /** One total per Category that has Transactions in the Month, in no particular order. */
+    List<CategoryTotal> categoryTotals(Month month);
+
+    /** One entry per Month that has Transactions, oldest Month first. */
+    List<MonthTotals> monthTotals();
 }

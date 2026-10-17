@@ -1,0 +1,55 @@
+/* Month dashboard. Pie slice colours: categorical slots in fixed order, largest Category first;
+   slot 8 is the neutral "Other Categories" slice. Legend symbols use the same classes. */
+
+.dashboard-tile {
+    -fx-padding: 12 16 12 16;
+    -fx-spacing: 4;
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 6;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 6;
+}
+
+.chart-pie {
+    -fx-border-color: -color-bg-default;
+    -fx-border-width: 2;
+}
+
+.chart-pie-label, .chart-legend-item {
+    -fx-text-fill: -color-fg-default;
+    -fx-fill: -color-fg-default;
+}
+
+.chart-pie.default-color0, .pie-legend-symbol.default-color0 { -fx-pie-color: #2a78d6; -fx-background-color: #2a78d6; }
+.chart-pie.default-color1, .pie-legend-symbol.default-color1 { -fx-pie-color: #eb6834; -fx-background-color: #eb6834; }
+.chart-pie.default-color2, .pie-legend-symbol.default-color2 { -fx-pie-color: #1baf7a; -fx-background-color: #1baf7a; }
+.chart-pie.default-color3, .pie-legend-symbol.default-color3 { -fx-pie-color: #eda100; -fx-background-color: #eda100; }
+.chart-pie.default-color4, .pie-legend-symbol.default-color4 { -fx-pie-color: #e87ba4; -fx-background-color: #e87ba4; }
+.chart-pie.default-color5, .pie-legend-symbol.default-color5 { -fx-pie-color: #008300; -fx-background-color: #008300; }
+.chart-pie.default-color6, .pie-legend-symbol.default-color6 { -fx-pie-color: #6250d6; -fx-background-color: #6250d6; }
+.chart-pie.default-color7, .pie-legend-symbol.default-color7 { -fx-pie-color: #8a8a85; -fx-background-color: #8a8a85; }
+
+/* Deficits: a completed Month whose Leftover is negative. */
+.deficit-badge {
+    -fx-padding: 2 8 2 8;
+    -fx-background-color: -color-danger-emphasis;
+    -fx-background-radius: 4;
+    -fx-text-fill: -color-fg-emphasis;
+    -fx-font-weight: bold;
+}
+
+.deficit-list {
+    -fx-padding: 8 12 8 12;
+    -fx-background-color: -color-danger-subtle;
+    -fx-background-radius: 6;
+    -fx-border-color: -color-danger-muted;
+    -fx-border-radius: 6;
+}
+
+.category-swatch {
+    -fx-min-width: 10;
+    -fx-min-height: 10;
+    -fx-max-width: 10;
+    -fx-max-height: 10;
+    -fx-background-radius: 2;
+}
