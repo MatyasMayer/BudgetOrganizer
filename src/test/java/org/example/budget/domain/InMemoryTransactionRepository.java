@@ -46,4 +46,15 @@ public class InMemoryTransactionRepository implements TransactionRepository {
                 .sorted(NEWEST_FIRST)
                 .toList();
     }
+
+    @Override
+    public List<CategoryTotal> categoryTotals(Month month) {
+        Map<Long, CategoryTotal> totals = new LinkedHashMap<>();
+        for (Transaction transaction : find(TransactionFilter.ALL.inMonth(month))) {
+            totals.merge(transaction.categoryId(),
+                    new CategoryTotal(transaction.categoryId(), transaction.type(), transaction.amount()),
+                    (sum, more) -> new CategoryTotal(sum.categoryId(), sum.type(), sum.total().plus(more.total())));
+        }
+        return List.copyOf(totals.values());
+    }
 }
