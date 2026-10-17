@@ -9,7 +9,9 @@ import javafx.stage.Stage;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Clock;
 import org.example.budget.storage.Database;
+import org.example.budget.storage.SqliteCategoryRepository;
 import org.example.budget.storage.SqliteSettingsRepository;
+import org.example.budget.storage.SqliteTransactionRepository;
 import org.example.budget.ui.MainController;
 import org.example.budget.ui.Messages;
 
@@ -29,9 +31,14 @@ public class BudgetOrganizerApp extends Application {
         Database database = Database.openIn(Database.defaultDataDirectory());
         LOG.log(System.Logger.Level.INFO, "Using database {0}", database.file());
 
-        BudgetService service = new BudgetService(new SqliteSettingsRepository(database), Clock.system());
+        BudgetService service = new BudgetService(
+                new SqliteSettingsRepository(database),
+                new SqliteCategoryRepository(database),
+                new SqliteTransactionRepository(database),
+                Clock.system());
         Locale locale = Locale.forLanguageTag(System.getProperty(LANGUAGE_PROPERTY, "en"));
         ResourceBundle messages = Messages.bundle(locale);
+        service.seedPresetCategories(preset -> messages.getString(Messages.presetCategoryKey(preset)));
 
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
 

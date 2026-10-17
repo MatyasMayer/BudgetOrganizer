@@ -1,7 +1,10 @@
 package org.example.budget.ui;
 
+import org.example.budget.domain.PresetCategory;
+import org.example.budget.domain.TransactionType;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.Set;
@@ -24,6 +27,21 @@ class MessagesTest {
             Messages.bundle(Locale.ENGLISH).getString(screen.titleKey());
             Messages.bundle(Locale.forLanguageTag("cs")).getString(screen.titleKey());
         }
+    }
+
+    @Test
+    void everyPresetCategoryAndTransactionTypeHasANameInBothLanguages() {
+        for (Locale locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("cs"))) {
+            ResourceBundle bundle = Messages.bundle(locale);
+            for (PresetCategory preset : PresetCategory.values()) {
+                bundle.getString(Messages.presetCategoryKey(preset));
+            }
+            for (TransactionType type : TransactionType.values()) {
+                bundle.getString(Messages.typeKey(type));
+            }
+        }
+        assertEquals("Z úspor", Messages.bundle(Locale.forLanguageTag("cs"))
+                .getString(Messages.presetCategoryKey(PresetCategory.FROM_SAVINGS)));
     }
 
     @Test
