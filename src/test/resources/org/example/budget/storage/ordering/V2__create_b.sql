@@ -1,0 +1,3 @@
+-- depends on V1
+CREATE TABLE b (id INTEGER PRIMARY KEY);
+INSERT INTO b (id) SELECT id FROM a;
