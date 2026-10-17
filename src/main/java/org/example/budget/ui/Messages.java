@@ -1,5 +1,6 @@
 package org.example.budget.ui;
 
+import org.example.budget.domain.InvalidCategoryException;
 import org.example.budget.domain.InvalidTransactionException;
 import org.example.budget.domain.PresetCategory;
 import org.example.budget.domain.TransactionType;
@@ -32,6 +33,11 @@ public final class Messages {
     /** Bundle key of the message for a rejected Transaction, e.g. {@code transaction.error.zero-amount}. */
     public static String problemKey(InvalidTransactionException.Problem problem) {
         return "transaction.error." + problem.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /** Bundle key of the message for a refused Category change, e.g. {@code category.error.blank-name}. */
+    public static String categoryProblemKey(InvalidCategoryException.Problem problem) {
+        return "category.error." + problem.name().toLowerCase(Locale.ROOT).replace('_', '-');
     }
 
     /** Bundle key of a Transaction type's name, e.g. {@code transaction.type.expense}. */

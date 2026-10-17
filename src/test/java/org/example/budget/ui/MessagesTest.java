@@ -1,5 +1,6 @@
 package org.example.budget.ui;
 
+import org.example.budget.domain.InvalidCategoryException;
 import org.example.budget.domain.InvalidTransactionException;
 import org.example.budget.domain.PresetCategory;
 import org.example.budget.domain.TransactionType;
@@ -46,6 +47,15 @@ class MessagesTest {
         }
         assertEquals("Z úspor", Messages.bundle(Locale.forLanguageTag("cs"))
                 .getString(Messages.presetCategoryKey(PresetCategory.FROM_SAVINGS)));
+    }
+
+    @Test
+    void everyRefusedCategoryChangeHasAMessageInBothLanguages() {
+        for (Locale locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("cs"))) {
+            for (InvalidCategoryException.Problem problem : InvalidCategoryException.Problem.values()) {
+                Messages.bundle(locale).getString(Messages.categoryProblemKey(problem));
+            }
+        }
     }
 
     @Test
