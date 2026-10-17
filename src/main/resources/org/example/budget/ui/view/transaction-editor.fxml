@@ -31,15 +31,36 @@
     <DatePicker fx:id="date" maxWidth="Infinity" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
 
     <Label text="%editor.amount" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
-    <TextField fx:id="amount" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+    <HBox spacing="8" GridPane.rowIndex="2" GridPane.columnIndex="1">
+        <TextField fx:id="amount" HBox.hgrow="ALWAYS"/>
+        <ComboBox fx:id="currency" prefWidth="90"/>
+    </HBox>
     <Label text="%editor.amount.hint" styleClass="text-muted" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
 
-    <Label text="%editor.category" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
-    <ComboBox fx:id="category" maxWidth="Infinity" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+    <!-- Shown only for an amount in a foreign currency (EUR). -->
+    <GridPane fx:id="foreignCurrency" hgap="12" vgap="10" GridPane.rowIndex="4" GridPane.columnIndex="0"
+              GridPane.columnSpan="2">
+        <columnConstraints>
+            <ColumnConstraints minWidth="120"/>
+            <ColumnConstraints minWidth="280" hgrow="ALWAYS"/>
+        </columnConstraints>
+        <Label text="%editor.cnb-rate" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+        <Label fx:id="cnbRate" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+        <Label text="%editor.czk-amount" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+        <Label fx:id="czkAmount" styleClass="text-bold" wrapText="true" GridPane.rowIndex="1"
+               GridPane.columnIndex="1"/>
+        <Label text="%editor.charged-amount" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+        <TextField fx:id="chargedAmount" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+        <Label text="%editor.charged-amount.hint" styleClass="text-muted" wrapText="true" GridPane.rowIndex="3"
+               GridPane.columnIndex="1"/>
+    </GridPane>
 
-    <Label text="%editor.note" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
-    <TextField fx:id="note" GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+    <Label text="%editor.category" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
+    <ComboBox fx:id="category" maxWidth="Infinity" GridPane.rowIndex="5" GridPane.columnIndex="1"/>
 
-    <Label fx:id="error" styleClass="danger" wrapText="true" GridPane.rowIndex="6" GridPane.columnIndex="0"
+    <Label text="%editor.note" GridPane.rowIndex="6" GridPane.columnIndex="0"/>
+    <TextField fx:id="note" GridPane.rowIndex="6" GridPane.columnIndex="1"/>
+
+    <Label fx:id="error" styleClass="danger" wrapText="true" GridPane.rowIndex="7" GridPane.columnIndex="0"
            GridPane.columnSpan="2"/>
 </GridPane>

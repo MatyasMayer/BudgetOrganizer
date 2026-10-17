@@ -1,5 +1,6 @@
 package org.example.budget.ui;
 
+import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -15,12 +16,17 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.layout.GridPane;
 import javafx.stage.Window;
 import javafx.util.StringConverter;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Category;
+import org.example.budget.domain.CnbRate;
+import org.example.budget.domain.Conversion;
+import org.example.budget.domain.Currency;
 import org.example.budget.domain.InvalidTransactionException;
 import org.example.budget.domain.Money;
+import org.example.budget.domain.OriginalAmount;
 import org.example.budget.domain.Transaction;
 import org.example.budget.domain.TransactionDetails;
 import org.example.budget.domain.TransactionType;
@@ -28,6 +34,7 @@ import org.example.budget.domain.TransactionType;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.text.MessageFormat;
+import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -59,11 +66,28 @@ public class TransactionEditorController {
     @FXML
     private TextField amount;
     @FXML
+    private ComboBox<Currency> currency;
+    @FXML
+    private GridPane foreignCurrency;
+    @FXML
+    private Label cnbRate;
+    @FXML
+    private Label czkAmount;
+    @FXML
+    private TextField chargedAmount;
+    @FXML
     private ComboBox<Category> category;
     @FXML
     private TextField note;
     @FXML
     private Label error;
+
+    /** The ČNB Rate looked up for {@link #rateDate}; empty while loading or when unavailable. */
+    private Optional<CnbRate> rate = Optional.empty();
+    private LocalDate rateDate;
+    private boolean rateLoading;
+    /** Discards the answer of a lookup that a newer one (another date or currency) has replaced. */
+    private long lookup;
 
     private TransactionEditorController(BudgetService service, Locale locale, Optional<Transaction> existing) {
         this.service = service;
@@ -109,17 +133,37 @@ public class TransactionEditorController {
         category.setCellFactory(list -> new CategoryCell());
         category.setButtonCell(new CategoryCell());
         typeGroup.selectedToggleProperty().addListener((obs, previous, selected) -> offerCategoriesOf(type()));
+        currency.getItems().setAll(Currency.values());
+        currency.setConverter(new CurrencyConverter());
+        foreignCurrency.managedProperty().bind(foreignCurrency.visibleProperty());
 
         existing.ifPresentOrElse(this::fill, () -> {
             date.setValue(service.today());
             expenseType.setSelected(true);
+            currency.setValue(Currency.CZK);
         });
+
+        currency.valueProperty().addListener((obs, previous, value) -> refreshRate());
+        date.valueProperty().addListener((obs, previous, value) -> refreshRate());
+        amount.textProperty().addListener((obs, previous, value) -> showConversion());
+        chargedAmount.textProperty().addListener((obs, previous, value) -> showConversion());
+        refreshRate();
     }
 
     private void fill(Transaction transaction) {
         (transaction.type() == TransactionType.INCOME ? incomeType : expenseType).setSelected(true);
         date.setValue(transaction.date());
-        amount.setText(transaction.amount().formatAmount(locale));
+        transaction.details().conversion().ifPresentOrElse(conversion -> {
+            currency.setValue(conversion.originalAmount().currency());
+            amount.setText(conversion.originalAmount().formatAmount(locale));
+            chargedAmount.setText(conversion.chargedAmount().map(m -> m.formatAmount(locale)).orElse(""));
+            // Keep the rate it was saved with while the date stays the same.
+            rate = Optional.of(conversion.cnbRate());
+            rateDate = transaction.date();
+        }, () -> {
+            currency.setValue(Currency.CZK);
+            amount.setText(transaction.amount().formatAmount(locale));
+        });
         category.getItems().stream()
                 .filter(c -> c.id() == transaction.categoryId())
                 .findFirst()
@@ -155,8 +199,26 @@ public class TransactionEditorController {
         if (category.getValue() == null) {
             return fail(resources.getString("transaction.error.unknown-category"));
         }
-        TransactionDetails details = new TransactionDetails(
-                chosenDate.get(), type(), category.getValue().id(), chosenAmount.get(), note.getText());
+        TransactionDetails details;
+        if (isForeign()) {
+            Optional<Optional<Money>> charged = typedChargedAmount();
+            if (charged.isEmpty()) {
+                return fail(MessageFormat.format(resources.getString("editor.error.charged-amount"),
+                        Money.ofHalere(49_310).formatAmount(locale)));
+            }
+            OriginalAmount original = new OriginalAmount(currency.getValue(), chosenAmount.get().halere());
+            Optional<Conversion> conversion = rateFor(chosenDate.get())
+                    .map(r -> new Conversion(original, r, charged.get()))
+                    .or(() -> service.convert(original, chosenDate.get(), charged.get()));
+            if (conversion.isEmpty()) {
+                return fail(resources.getString("editor.error.rate-unavailable"));
+            }
+            details = TransactionDetails.converted(
+                    chosenDate.get(), type(), category.getValue().id(), conversion.get(), note.getText());
+        } else {
+            details = new TransactionDetails(
+                    chosenDate.get(), type(), category.getValue().id(), chosenAmount.get(), note.getText());
+        }
         try {
             existing.ifPresentOrElse(
                     transaction -> service.editTransaction(transaction.id(), details),
@@ -183,6 +245,102 @@ public class TransactionEditorController {
     private boolean fail(String message) {
         error.setText(message);
         return false;
+    }
+
+    // --- Foreign currency ---
+
+    private boolean isForeign() {
+        return currency.getValue() != null && !currency.getValue().isBaseCurrency();
+    }
+
+    /** The Charged Amount as typed: empty when unreadable, an empty Optional inside when left blank. */
+    private Optional<Optional<Money>> typedChargedAmount() {
+        String text = chargedAmount.getText();
+        if (text == null || text.isBlank()) {
+            return Optional.of(Optional.empty());
+        }
+        return Money.parse(text, locale).map(Optional::of);
+    }
+
+    private Optional<CnbRate> rateFor(LocalDate day) {
+        return day.equals(rateDate) ? rate.filter(r -> r.currency() == currency.getValue()) : Optional.empty();
+    }
+
+    /** Looks up the ČNB Rate for the chosen date off the UI thread, since it may need the network. */
+    private void refreshRate() {
+        foreignCurrency.setVisible(isForeign());
+        LocalDate day = date.getValue();
+        if (!isForeign() || day == null || rateFor(day).isPresent()) {
+            showConversion();
+            return;
+        }
+        Currency chosen = currency.getValue();
+        long thisLookup = ++lookup;
+        rateLoading = true;
+        rate = Optional.empty();
+        rateDate = day;
+        showConversion();
+        Thread.ofVirtual().start(() -> {
+            Optional<CnbRate> found = service.cnbRate(chosen, day);
+            Platform.runLater(() -> {
+                if (thisLookup == lookup) {
+                    rateLoading = false;
+                    rate = found;
+                    showConversion();
+                }
+            });
+        });
+    }
+
+    private void showConversion() {
+        if (!isForeign()) {
+            return;
+        }
+        LocalDate day = date.getValue();
+        Optional<CnbRate> current = day == null ? Optional.empty() : rateFor(day);
+        if (rateLoading) {
+            cnbRate.setText(resources.getString("editor.cnb-rate.loading"));
+        } else if (current.isEmpty()) {
+            cnbRate.setText(resources.getString("editor.cnb-rate.unavailable"));
+        } else {
+            CnbRate r = current.get();
+            cnbRate.setText(MessageFormat.format(resources.getString("editor.cnb-rate.value"),
+                    r.currency().code(), formatRate(r), r.validFor().format(dateFormat())));
+        }
+
+        Optional<OriginalAmount> original = Money.parse(amount.getText(), locale)
+                .map(m -> new OriginalAmount(currency.getValue(), m.halere()));
+        Optional<Money> converted = original.flatMap(o -> current.map(r -> r.convert(o)));
+        Optional<Money> charged = typedChargedAmount().flatMap(c -> c);
+        if (charged.isPresent()) {
+            czkAmount.setText(MessageFormat.format(resources.getString("editor.czk-amount.charged"),
+                    charged.get().format(locale), converted.map(m -> m.format(locale)).orElse("–")));
+        } else {
+            czkAmount.setText(converted.map(m -> m.format(locale)).orElse("–"));
+        }
+    }
+
+    private String formatRate(CnbRate r) {
+        NumberFormat number = NumberFormat.getNumberInstance(locale);
+        number.setMinimumFractionDigits(3);
+        number.setMaximumFractionDigits(6);
+        return number.format(r.czkPerUnit());
+    }
+
+    private DateTimeFormatter dateFormat() {
+        return DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale);
+    }
+
+    private static final class CurrencyConverter extends StringConverter<Currency> {
+        @Override
+        public String toString(Currency value) {
+            return value == null ? "" : value.code();
+        }
+
+        @Override
+        public Currency fromString(String text) {
+            return Currency.valueOf(text);
+        }
     }
 
     private static final class CategoryCell extends ListCell<Category> {

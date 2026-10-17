@@ -6,10 +6,12 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import org.example.budget.currency.CnbRateSource;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Clock;
 import org.example.budget.storage.Database;
 import org.example.budget.storage.SqliteCategoryRepository;
+import org.example.budget.storage.SqliteCnbRateRepository;
 import org.example.budget.storage.SqliteSettingsRepository;
 import org.example.budget.storage.SqliteTransactionRepository;
 import org.example.budget.ui.MainController;
@@ -35,6 +37,8 @@ public class BudgetOrganizerApp extends Application {
                 new SqliteSettingsRepository(database),
                 new SqliteCategoryRepository(database),
                 new SqliteTransactionRepository(database),
+                new SqliteCnbRateRepository(database),
+                CnbRateSource.overHttp(),
                 Clock.system());
         Locale locale = Locale.forLanguageTag(System.getProperty(LANGUAGE_PROPERTY, "en"));
         ResourceBundle messages = Messages.bundle(locale);
