@@ -353,6 +353,53 @@ public abstract class TransactionRepositoryContract {
         assertEquals(Optional.of(pay), repository.find(pay.id()));
     }
 
+    @Test
+    void aSavingsFundedExpenseKeepsItsMarkThroughAddUpdateAndMerge() {
+        Transaction pc = repository.add(expense(LocalDate.of(2026, 10, 12), games, 4_000_000, "PC")
+                .withSavingsFunded(true));
+        assertTrue(repository.find(pc.id()).orElseThrow().details().savingsFunded());
+
+        repository.moveToCategory(games, food);
+        assertTrue(repository.find(pc.id()).orElseThrow().details().savingsFunded());
+
+        repository.update(new Transaction(pc.id(), pc.details().withSavingsFunded(false)));
+        assertFalse(repository.find(pc.id()).orElseThrow().details().savingsFunded());
+    }
+
+    @Test
+    void categoryAndMonthTotalsLeaveSavingsFundedExpensesOut() {
+        repository.add(expense(LocalDate.of(2026, 10, 3), food, 50_000, ""));
+        repository.add(expense(LocalDate.of(2026, 10, 12), food, 300_000, "").withSavingsFunded(true));
+        repository.add(expense(LocalDate.of(2026, 10, 12), games, 4_000_000, "PC").withSavingsFunded(true));
+
+        List<CategoryTotal> expected = List.of(new CategoryTotal(food, TransactionType.EXPENSE, Money.ofHalere(50_000)));
+        assertEquals(expected, repository.categoryTotals(Month.of(2026, 10)));
+        assertEquals(expected, repository.categoryTotals(LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)));
+        assertEquals(List.of(new MonthTotals(Month.of(2026, 10), Money.ZERO, Money.ofHalere(50_000))),
+                repository.monthTotals());
+    }
+
+    @Test
+    void savingsFundedTotalsSumOnlySavingsFundedExpensesPerCategoryOfTheMonth() {
+        repository.add(expense(LocalDate.of(2026, 10, 3), food, 50_000, ""));
+        repository.add(expense(LocalDate.of(2026, 10, 12), food, 300_000, "").withSavingsFunded(true));
+        repository.add(expense(LocalDate.of(2026, 10, 13), food, 1, "").withSavingsFunded(true));
+        repository.add(expense(LocalDate.of(2026, 9, 30), games, 4_000_000, "PC").withSavingsFunded(true));
+
+        assertEquals(List.of(new CategoryTotal(food, TransactionType.EXPENSE, Money.ofHalere(300_001))),
+                repository.savingsFundedTotals(Month.of(2026, 10)));
+    }
+
+    @Test
+    void theSavingsFundedTotalSumsEverySavingsFundedExpenseEver() {
+        assertEquals(Money.ZERO, repository.savingsFundedTotal());
+        repository.add(expense(LocalDate.of(2026, 10, 3), food, 50_000, ""));
+        repository.add(expense(LocalDate.of(2026, 10, 12), food, 300_000, "").withSavingsFunded(true));
+        repository.add(expense(LocalDate.of(2025, 1, 30), games, 4_000_000, "PC").withSavingsFunded(true));
+
+        assertEquals(Money.ofHalere(4_300_000), repository.savingsFundedTotal());
+    }
+
     private static TransactionDetails expense(LocalDate date, long categoryId, long halere, String note) {
         return new TransactionDetails(date, TransactionType.EXPENSE, categoryId, Money.ofHalere(halere), note);
     }

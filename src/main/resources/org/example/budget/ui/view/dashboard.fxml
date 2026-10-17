@@ -56,6 +56,12 @@
                 </Label>
             </HBox>
         </VBox>
+        <VBox styleClass="dashboard-tile" HBox.hgrow="ALWAYS">
+            <Label text="%dashboard.savings" styleClass="text-muted">
+                <tooltip><Tooltip text="%dashboard.savings.hint"/></tooltip>
+            </Label>
+            <Label fx:id="savingsTotal" styleClass="title-3"/>
+        </VBox>
     </HBox>
 
     <HBox fx:id="uncoveredDeficits" styleClass="deficit-list" spacing="8" alignment="CENTER_LEFT"

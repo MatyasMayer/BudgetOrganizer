@@ -21,6 +21,7 @@ class SavingsScenarioTest {
     private final InMemoryTransactionRepository transactions = new InMemoryTransactionRepository();
     private final InMemoryCategoryRepository categories = new InMemoryCategoryRepository();
     private final InMemoryBudgetLimitRepository limits = new InMemoryBudgetLimitRepository();
+    private final InMemoryRecurringTemplateRepository recurring = new InMemoryRecurringTemplateRepository();
     private BudgetService service = serviceOn(TODAY);
 
     @BeforeEach
@@ -206,7 +207,7 @@ class SavingsScenarioTest {
     }
 
     private BudgetService serviceOn(LocalDate today) {
-        return new BudgetService(settings, categories, transactions, limits, Clock.fixed(today));
+        return new BudgetService(settings, categories, transactions, recurring, limits, Clock.fixed(today));
     }
 
     private Transaction income(LocalDate date, String category, long czk) {

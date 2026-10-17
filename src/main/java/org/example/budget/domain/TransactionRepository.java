@@ -23,12 +23,20 @@ public interface TransactionRepository {
     /** The Transactions matching the filter, newest date first (and newest added first within a day). */
     List<Transaction> find(TransactionFilter filter);
 
-    /** One total per Category that has Transactions in the Month, in no particular order. */
+    /** One total per Category that has Transactions in the Month, in no particular order, without Savings-Funded
+     * Expenses. */
     List<CategoryTotal> categoryTotals(Month month);
 
-    /** One total per Category that has Transactions from {@code from} through {@code through} (both included). */
+    /** One total per Category that has Transactions from {@code from} through {@code through} (both included),
+     * without Savings-Funded Expenses. */
     List<CategoryTotal> categoryTotals(LocalDate from, LocalDate through);
 
-    /** One entry per Month that has Transactions, oldest Month first. */
+    /** One entry per Month that has Transactions, oldest Month first, without Savings-Funded Expenses. */
     List<MonthTotals> monthTotals();
+
+    /** One total per Category that has Savings-Funded Expenses in the Month, in no particular order. */
+    List<CategoryTotal> savingsFundedTotals(Month month);
+
+    /** The sum of every Savings-Funded Expense in any Month. */
+    Money savingsFundedTotal();
 }
