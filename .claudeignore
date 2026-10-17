@@ -1,0 +1,40 @@
+# Build output (Gradle)
+build/
+**/build/
+.gradle/
+.kotlin/
+out/
+bin/
+
+# Gradle wrapper binary
+gradle/wrapper/gradle-wrapper.jar
+
+# Agent worktrees: full copies of the repo (~280 MB)
+.claude/worktrees/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.settings/
+.classpath
+.project
+
+# Local data and databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Test and build reports, logs, binaries
+**/test-results/
+**/reports/
+*.log
+*.class
+*.jar
+
+# OS
+.DS_Store
+Thumbs.db
