@@ -509,7 +509,7 @@ public class BudgetService {
 
     // --- Recurring Templates ---
 
-    /** Creates a Recurring Template in CZK; its due occurrences appear on the next generation. */
+    /** Creates a Recurring Template in CZK or a foreign currency; its due occurrences appear on the next generation. */
     public RecurringTemplate createRecurringTemplate(RecurringTemplateDetails details) {
         validate(details);
         return recurringTemplates.add(details);
@@ -536,7 +536,7 @@ public class BudgetService {
                 () -> new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.UNKNOWN_TEMPLATE))
                 .details();
         editRecurringTemplate(id, new RecurringTemplateDetails(d.type(), d.categoryId(), d.amount(), d.note(),
-                d.frequency(), d.dayOfMonth(), d.startDate(), Optional.of(endDate)));
+                d.frequency(), d.dayOfMonth(), d.startDate(), Optional.of(endDate), d.originalAmount()));
     }
 
     /**
@@ -553,8 +553,11 @@ public class BudgetService {
                 if (YearMonth.from(date).isBefore(firstOpenMonth)) {
                     continue;
                 }
-                Transaction generated = transactions.add(new TransactionDetails(
-                        date, details.type(), details.categoryId(), details.amount(), details.note()));
+                Optional<TransactionDetails> occurrence = occurrence(details, date);
+                if (occurrence.isEmpty()) {
+                    break;
+                }
+                Transaction generated = transactions.add(occurrence.get());
                 recurringTemplates.addOccurrence(template.id(), date, generated.id());
             }
         }
@@ -573,6 +576,21 @@ public class BudgetService {
         return edited.filter(open::isBefore).orElse(open);
     }
 
+    /**
+     * The Transaction for the template's occurrence on the date. A foreign-currency occurrence is converted at
+     * the date's ČNB Rate, or offline at a Provisional Rate; empty when there is no rate at all yet, so the
+     * occurrence waits for a later generation.
+     */
+    private Optional<TransactionDetails> occurrence(RecurringTemplateDetails details, LocalDate date) {
+        if (details.originalAmount().isEmpty()) {
+            return Optional.of(new TransactionDetails(
+                    date, details.type(), details.categoryId(), details.amount(), details.note()));
+        }
+        OriginalAmount amount = details.originalAmount().get();
+        return rateToUse(amount.currency(), date).map(rate -> TransactionDetails.converted(date, details.type(),
+                details.categoryId(), rate.convert(amount, Optional.empty()), details.note()));
+    }
+
     /** The ids of Transactions generated from Recurring Templates, so the Transaction list can mark them. */
     public Set<Long> generatedTransactionIds() {
         return recurringTemplates.generatedTransactionIds();
@@ -589,7 +607,8 @@ public class BudgetService {
         if (category.type() != details.type()) {
             throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.CATEGORY_OF_OTHER_TYPE);
         }
-        if (details.amount().halere() <= 0) {
+        long amount = details.originalAmount().map(OriginalAmount::cents).orElse(details.amount().halere());
+        if (amount <= 0) {
             throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.AMOUNT_NOT_POSITIVE);
         }
         if (details.dayOfMonth() < 1 || details.dayOfMonth() > 31) {

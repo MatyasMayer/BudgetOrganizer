@@ -55,8 +55,7 @@ public class InMemoryRecurringTemplateRepository implements RecurringTemplateRep
             if (d.categoryId() != fromCategoryId) {
                 return template;
             }
-            return new RecurringTemplate(id, new RecurringTemplateDetails(d.type(), toCategoryId, d.amount(),
-                    d.note(), d.frequency(), d.dayOfMonth(), d.startDate(), d.endDate()));
+            return new RecurringTemplate(id, d.inCategory(toCategoryId));
         });
     }
 

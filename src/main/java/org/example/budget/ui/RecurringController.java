@@ -88,7 +88,9 @@ public class RecurringController {
     private void initialize() {
         typeColumn.setCellValueFactory(row -> text(resources.getString(Messages.typeKey(details(row).type()))));
         categoryColumn.setCellValueFactory(row -> text(categoryName(details(row).categoryId())));
-        amountColumn.setCellValueFactory(row -> text(details(row).amount().format(locale)));
+        amountColumn.setCellValueFactory(row -> text(details(row).originalAmount()
+                .map(original -> original.format(locale))
+                .orElseGet(() -> details(row).amount().format(locale))));
         repeatsColumn.setCellValueFactory(row -> text(repeats(details(row))));
         startColumn.setCellValueFactory(row -> text(details(row).startDate().format(dateFormat)));
         endColumn.setCellValueFactory(row -> text(details(row).endDate()

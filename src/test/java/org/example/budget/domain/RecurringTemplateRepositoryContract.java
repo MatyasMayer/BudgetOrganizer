@@ -71,6 +71,19 @@ public abstract class RecurringTemplateRepositoryContract {
     }
 
     @Test
+    void aEurTemplateKeepsItsOriginalAmount() {
+        RecurringTemplateDetails details = RecurringTemplateDetails.inForeignCurrency(TransactionType.EXPENSE,
+                subscriptions, new OriginalAmount(Currency.EUR, 1_099), "Spotify", Frequency.MONTHLY, 5,
+                LocalDate.of(2026, 9, 1), Optional.empty());
+
+        RecurringTemplate template = repository.add(details);
+        repository.moveToCategory(subscriptions, rent);
+
+        assertEquals(Optional.of(new RecurringTemplate(template.id(), details.inCategory(rent))),
+                repository.find(template.id()));
+    }
+
+    @Test
     void allTemplatesAreListedInTheOrderTheyWereAdded() {
         RecurringTemplate first = repository.add(spotify(subscriptions));
         RecurringTemplate second = repository.add(spotify(rent));
@@ -104,6 +117,20 @@ public abstract class RecurringTemplateRepositoryContract {
         assertEquals(Optional.of(LocalDate.of(2026, 10, 17)), repository.lastEdited(spotify.id()));
         assertEquals(Optional.of(flat), repository.find(flat.id()));
         assertEquals(Optional.empty(), repository.lastEdited(flat.id()));
+    }
+
+    @Test
+    void anUpdateCanSwitchATemplateIntoEurAndBackToCzk() {
+        RecurringTemplate spotify = repository.add(spotify(subscriptions));
+        RecurringTemplate inEur = new RecurringTemplate(spotify.id(), RecurringTemplateDetails.inForeignCurrency(
+                TransactionType.EXPENSE, subscriptions, new OriginalAmount(Currency.EUR, 1_199), "Spotify",
+                Frequency.MONTHLY, 5, LocalDate.of(2026, 9, 1), Optional.empty()));
+
+        repository.update(inEur, LocalDate.of(2026, 10, 17));
+        assertEquals(Optional.of(inEur), repository.find(spotify.id()));
+
+        repository.update(spotify, LocalDate.of(2026, 10, 18));
+        assertEquals(Optional.of(spotify), repository.find(spotify.id()));
     }
 
     @Test

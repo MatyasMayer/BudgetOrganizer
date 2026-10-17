@@ -19,9 +19,11 @@ import javafx.stage.Window;
 import javafx.util.StringConverter;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Category;
+import org.example.budget.domain.Currency;
 import org.example.budget.domain.Frequency;
 import org.example.budget.domain.InvalidRecurringTemplateException;
 import org.example.budget.domain.Money;
+import org.example.budget.domain.OriginalAmount;
 import org.example.budget.domain.RecurringTemplate;
 import org.example.budget.domain.RecurringTemplateDetails;
 import org.example.budget.domain.TransactionType;
@@ -36,9 +38,9 @@ import java.util.Optional;
 import java.util.ResourceBundle;
 
 /**
- * The dialog that creates or edits a Recurring Template in CZK. Only Categories of the chosen type are offered;
- * for a new template the day of month and start date default to today. Saving goes through the service, which
- * validates; an edit applies only to occurrences generated from then on.
+ * The dialog that creates or edits a Recurring Template in CZK or EUR. Only Categories of the chosen type are
+ * offered; for a new template the day of month and start date default to today. Saving goes through the service,
+ * which validates; an edit applies only to occurrences generated from then on.
  */
 public class RecurringTemplateEditorController {
 
@@ -55,6 +57,10 @@ public class RecurringTemplateEditorController {
     private RadioButton incomeType;
     @FXML
     private TextField amount;
+    @FXML
+    private ComboBox<Currency> currency;
+    @FXML
+    private Label foreignCurrencyHint;
     @FXML
     private ComboBox<Category> category;
     @FXML
@@ -124,6 +130,13 @@ public class RecurringTemplateEditorController {
         category.setCellFactory(list -> new CategoryCell());
         category.setButtonCell(new CategoryCell());
         typeGroup.selectedToggleProperty().addListener((obs, previous, selected) -> offerCategoriesOf(type()));
+        currency.getItems().setAll(Currency.values());
+        currency.setConverter(new CurrencyConverter());
+        foreignCurrencyHint.managedProperty().bind(foreignCurrencyHint.visibleProperty());
+        currency.valueProperty().addListener((obs, previous, value) ->
+                foreignCurrencyHint.setVisible(value != null && !value.isBaseCurrency()));
+        currency.setValue(Currency.CZK);
+        foreignCurrencyHint.setVisible(false);
         frequency.getItems().setAll(Frequency.values());
         frequency.setConverter(new FrequencyConverter());
         startDate.setConverter(new TransactionEditorController.LocalizedDateConverter(locale));
@@ -143,7 +156,11 @@ public class RecurringTemplateEditorController {
         offerCategoriesOf(details.type());
         category.getItems().stream().filter(c -> c.id() == details.categoryId()).findFirst()
                 .ifPresent(category::setValue);
-        amount.setText(details.amount().formatAmount(locale));
+        currency.setValue(details.currency());
+        amount.setText(details.originalAmount()
+                .map(original -> Money.ofHalere(original.cents()))
+                .orElse(details.amount())
+                .formatAmount(locale));
         note.setText(details.note());
         frequency.setValue(details.frequency());
         day.setText(String.valueOf(details.dayOfMonth()));
@@ -188,9 +205,13 @@ public class RecurringTemplateEditorController {
         if (end.isEmpty()) {
             return fail(resources.getString("editor.error.date"));
         }
-        RecurringTemplateDetails details = new RecurringTemplateDetails(type(), category.getValue().id(),
-                chosenAmount.get(), note.getText(), frequency.getValue(), chosenDay.get(), start.get().get(),
-                end.get());
+        Currency chosenCurrency = currency.getValue();
+        RecurringTemplateDetails details = chosenCurrency.isBaseCurrency()
+                ? new RecurringTemplateDetails(type(), category.getValue().id(), chosenAmount.get(),
+                        note.getText(), frequency.getValue(), chosenDay.get(), start.get().get(), end.get())
+                : RecurringTemplateDetails.inForeignCurrency(type(), category.getValue().id(),
+                        new OriginalAmount(chosenCurrency, chosenAmount.get().halere()), note.getText(),
+                        frequency.getValue(), chosenDay.get(), start.get().get(), end.get());
         try {
             if (existing.isPresent()) {
                 service.editRecurringTemplate(existing.get().id(), details);
@@ -238,6 +259,18 @@ public class RecurringTemplateEditorController {
         @Override
         public Frequency fromString(String text) {
             throw new UnsupportedOperationException("The frequency is chosen, not typed");
+        }
+    }
+
+    private static final class CurrencyConverter extends StringConverter<Currency> {
+        @Override
+        public String toString(Currency value) {
+            return value == null ? "" : value.code();
+        }
+
+        @Override
+        public Currency fromString(String text) {
+            return Currency.valueOf(text);
         }
     }
 

@@ -1,7 +1,9 @@
 package org.example.budget.storage;
 
+import org.example.budget.domain.Currency;
 import org.example.budget.domain.Frequency;
 import org.example.budget.domain.Money;
+import org.example.budget.domain.OriginalAmount;
 import org.example.budget.domain.RecurringTemplate;
 import org.example.budget.domain.RecurringTemplateDetails;
 import org.example.budget.domain.RecurringTemplateRepository;
@@ -22,7 +24,7 @@ import java.util.Set;
 public class SqliteRecurringTemplateRepository implements RecurringTemplateRepository {
 
     private static final String COLUMNS = "SELECT id, type, category_id, amount, note, frequency, day_of_month,"
-            + " start_date, end_date FROM recurring_templates";
+            + " start_date, end_date, original_currency, original_amount FROM recurring_templates";
 
     private final Database database;
 
@@ -35,7 +37,8 @@ public class SqliteRecurringTemplateRepository implements RecurringTemplateRepos
         try (Connection connection = database.connect();
              PreparedStatement insert = connection.prepareStatement(
                      "INSERT INTO recurring_templates (type, category_id, amount, note, frequency, day_of_month,"
-                             + " start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                             + " start_date, end_date, original_currency, original_amount)"
+                             + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                      Statement.RETURN_GENERATED_KEYS)) {
             insert.setString(1, details.type().name());
             insert.setLong(2, details.categoryId());
@@ -45,6 +48,9 @@ public class SqliteRecurringTemplateRepository implements RecurringTemplateRepos
             insert.setInt(6, details.dayOfMonth());
             insert.setString(7, details.startDate().toString());
             insert.setString(8, details.endDate().map(LocalDate::toString).orElse(null));
+            Optional<OriginalAmount> original = details.originalAmount();
+            insert.setString(9, original.map(amount -> amount.currency().name()).orElse(null));
+            insert.setObject(10, original.map(OriginalAmount::cents).orElse(null));
             insert.executeUpdate();
             try (ResultSet keys = insert.getGeneratedKeys()) {
                 keys.next();
@@ -74,7 +80,8 @@ public class SqliteRecurringTemplateRepository implements RecurringTemplateRepos
         try (Connection connection = database.connect();
              PreparedStatement update = connection.prepareStatement(
                      "UPDATE recurring_templates SET type = ?, category_id = ?, amount = ?, note = ?, frequency = ?,"
-                             + " day_of_month = ?, start_date = ?, end_date = ?, edited_on = ? WHERE id = ?")) {
+                             + " day_of_month = ?, start_date = ?, end_date = ?, original_currency = ?,"
+                             + " original_amount = ?, edited_on = ? WHERE id = ?")) {
             update.setString(1, details.type().name());
             update.setLong(2, details.categoryId());
             update.setLong(3, details.amount().halere());
@@ -83,8 +90,11 @@ public class SqliteRecurringTemplateRepository implements RecurringTemplateRepos
             update.setInt(6, details.dayOfMonth());
             update.setString(7, details.startDate().toString());
             update.setString(8, details.endDate().map(LocalDate::toString).orElse(null));
-            update.setString(9, editedOn.toString());
-            update.setLong(10, template.id());
+            Optional<OriginalAmount> original = details.originalAmount();
+            update.setString(9, original.map(amount -> amount.currency().name()).orElse(null));
+            update.setObject(10, original.map(OriginalAmount::cents).orElse(null));
+            update.setString(11, editedOn.toString());
+            update.setLong(12, template.id());
             update.executeUpdate();
         } catch (SQLException e) {
             throw new StorageException("Cannot update Recurring Template " + template.id(), e);
@@ -179,6 +189,9 @@ public class SqliteRecurringTemplateRepository implements RecurringTemplateRepos
     }
 
     private static RecurringTemplate read(ResultSet row) throws SQLException {
+        String originalCurrency = row.getString("original_currency");
+        Optional<OriginalAmount> originalAmount = originalCurrency == null ? Optional.empty()
+                : Optional.of(new OriginalAmount(Currency.valueOf(originalCurrency), row.getLong("original_amount")));
         return new RecurringTemplate(row.getLong("id"), new RecurringTemplateDetails(
                 TransactionType.valueOf(row.getString("type")),
                 row.getLong("category_id"),
@@ -187,6 +200,7 @@ public class SqliteRecurringTemplateRepository implements RecurringTemplateRepos
                 Frequency.valueOf(row.getString("frequency")),
                 row.getInt("day_of_month"),
                 LocalDate.parse(row.getString("start_date")),
-                Optional.ofNullable(row.getString("end_date")).map(LocalDate::parse)));
+                Optional.ofNullable(row.getString("end_date")).map(LocalDate::parse),
+                originalAmount));
     }
 }

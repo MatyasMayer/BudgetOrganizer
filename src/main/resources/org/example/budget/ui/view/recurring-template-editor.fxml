@@ -10,6 +10,7 @@
 <?import javafx.scene.layout.ColumnConstraints?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
 
 <!-- Content of the Recurring Template editor dialog; the dialog is built by RecurringTemplateEditorController. -->
 <GridPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" hgap="12" vgap="10">
@@ -28,7 +29,15 @@
     </HBox>
 
     <Label text="%recurring.editor.amount" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-    <TextField fx:id="amount" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+    <VBox spacing="4" GridPane.rowIndex="1" GridPane.columnIndex="1">
+        <HBox spacing="8">
+            <TextField fx:id="amount" HBox.hgrow="ALWAYS"/>
+            <ComboBox fx:id="currency" prefWidth="90"/>
+        </HBox>
+        <!-- Shown only for a foreign currency (EUR). -->
+        <Label fx:id="foreignCurrencyHint" text="%recurring.editor.foreign.hint" styleClass="text-muted"
+               wrapText="true"/>
+    </VBox>
 
     <Label text="%editor.category" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
     <ComboBox fx:id="category" maxWidth="Infinity" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
