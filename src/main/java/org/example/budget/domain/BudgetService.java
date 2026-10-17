@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -79,17 +80,24 @@ public class BudgetService {
         return !transactions.find(TransactionFilter.ALL.inCategory(categoryId)).isEmpty();
     }
 
-    /** Deletes a Category that has no Transactions. From Savings can't be deleted. */
+    /** Whether Transactions or Recurring Templates use the Category, so deleting it needs a replacement. */
+    public boolean needsReplacement(long categoryId) {
+        return hasTransactions(categoryId) || recurringTemplates.findAll().stream()
+                .anyMatch(template -> template.details().categoryId() == categoryId);
+    }
+
+    /** Deletes a Category that no Transaction or Recurring Template uses. From Savings can't be deleted. */
     public void deleteCategory(long id) {
         deletable(id);
-        if (hasTransactions(id)) {
+        if (needsReplacement(id)) {
             throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_REQUIRED);
         }
         categories.delete(id);
     }
 
     /**
-     * Deletes a Category and merges it into the replacement: all its Transactions move there.
+     * Deletes a Category and merges it into the replacement: all its Transactions and Recurring Templates
+     * move there.
      * The replacement must be another Category of the same type. From Savings can't be merged away.
      */
     public void deleteCategory(long id, long replacementId) {
@@ -101,6 +109,7 @@ public class BudgetService {
             throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_OF_OTHER_TYPE);
         }
         transactions.moveToCategory(id, replacementId);
+        recurringTemplates.moveToCategory(id, replacementId);
         categories.delete(id);
     }
 
@@ -193,6 +202,7 @@ public class BudgetService {
 
     /** Creates a Recurring Template in CZK; its due occurrences appear on the next generation. */
     public RecurringTemplate createRecurringTemplate(RecurringTemplateDetails details) {
+        validate(details);
         return recurringTemplates.add(details);
     }
 
@@ -217,8 +227,30 @@ public class BudgetService {
         }
     }
 
+    /** The ids of Transactions generated from Recurring Templates, so the Transaction list can mark them. */
+    public Set<Long> generatedTransactionIds() {
+        return recurringTemplates.generatedTransactionIds();
+    }
+
     /** All Recurring Templates in the order they were created. */
     public List<RecurringTemplate> recurringTemplates() {
         return recurringTemplates.findAll();
+    }
+
+    private void validate(RecurringTemplateDetails details) {
+        Category category = categories.find(details.categoryId()).orElseThrow(
+                () -> new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.UNKNOWN_CATEGORY));
+        if (category.type() != details.type()) {
+            throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.CATEGORY_OF_OTHER_TYPE);
+        }
+        if (details.amount().halere() <= 0) {
+            throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.AMOUNT_NOT_POSITIVE);
+        }
+        if (details.dayOfMonth() < 1 || details.dayOfMonth() > 31) {
+            throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.DAY_OUT_OF_RANGE);
+        }
+        if (details.endDate().filter(end -> end.isBefore(details.startDate())).isPresent()) {
+            throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.END_BEFORE_START);
+        }
     }
 }

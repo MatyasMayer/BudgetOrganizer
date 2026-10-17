@@ -14,8 +14,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public class SqliteRecurringTemplateRepository implements RecurringTemplateRepository {
 
@@ -82,6 +84,19 @@ public class SqliteRecurringTemplateRepository implements RecurringTemplateRepos
     }
 
     @Override
+    public void moveToCategory(long fromCategoryId, long toCategoryId) {
+        try (Connection connection = database.connect();
+             PreparedStatement update = connection.prepareStatement(
+                     "UPDATE recurring_templates SET category_id = ? WHERE category_id = ?")) {
+            update.setLong(1, toCategoryId);
+            update.setLong(2, fromCategoryId);
+            update.executeUpdate();
+        } catch (SQLException e) {
+            throw new StorageException("Cannot move Recurring Templates of Category " + fromCategoryId, e);
+        }
+    }
+
+    @Override
     public void addOccurrence(long templateId, LocalDate occurrenceDate, long transactionId) {
         try (Connection connection = database.connect();
              PreparedStatement insert = connection.prepareStatement(
@@ -107,6 +122,22 @@ public class SqliteRecurringTemplateRepository implements RecurringTemplateRepos
             }
         } catch (SQLException e) {
             throw new StorageException("Cannot read occurrences of template " + templateId, e);
+        }
+    }
+
+    @Override
+    public Set<Long> generatedTransactionIds() {
+        try (Connection connection = database.connect();
+             PreparedStatement query = connection.prepareStatement(
+                     "SELECT transaction_id FROM generated_occurrences WHERE transaction_id IS NOT NULL");
+             ResultSet result = query.executeQuery()) {
+            Set<Long> ids = new HashSet<>();
+            while (result.next()) {
+                ids.add(result.getLong(1));
+            }
+            return Set.copyOf(ids);
+        } catch (SQLException e) {
+            throw new StorageException("Cannot list generated Transactions", e);
         }
     }
 

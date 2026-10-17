@@ -6,9 +6,13 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Facade-level scenarios for Recurring Templates in CZK: creating them and generating their occurrences. */
 class RecurringTemplateScenarioTest {
@@ -195,6 +199,81 @@ class RecurringTemplateScenarioTest {
         service.generateDueOccurrences();
 
         assertEquals(List.of(), datesIn(rent));
+    }
+
+    @Test
+    void generatedTransactionsAreMarkedAndRecordedOnesAreNot() {
+        service.createRecurringTemplate(monthly(TransactionType.EXPENSE, rent, 1_200_000, "Flat", 1,
+                LocalDate.of(2026, 9, 1)));
+        Transaction recorded = service.recordTransaction(new TransactionDetails(LocalDate.of(2026, 10, 5),
+                TransactionType.EXPENSE, rent, Money.ofHalere(50_000), "Plumber"));
+
+        service.generateDueOccurrences();
+
+        Set<Long> generated = service.generatedTransactionIds();
+        List<Transaction> list = service.transactions(TransactionFilter.ALL.inCategory(rent));
+        assertEquals(List.of("Plumber", "Flat", "Flat"), list.stream().map(Transaction::note).toList());
+        assertEquals(List.of(false, true, true), list.stream().map(t -> generated.contains(t.id())).toList());
+        assertFalse(generated.contains(recorded.id()));
+    }
+
+    @Test
+    void deletingACategoryMovesItsTemplatesToTheReplacement() {
+        long subscriptions = category(TransactionType.EXPENSE, "SUBSCRIPTIONS");
+        long other = category(TransactionType.EXPENSE, "OTHER_EXPENSE");
+        RecurringTemplate spotify = service.createRecurringTemplate(monthly(TransactionType.EXPENSE, subscriptions,
+                16_900, "Spotify", 5, LocalDate.of(2026, 9, 1)));
+        service.generateDueOccurrences();
+
+        service.deleteCategory(subscriptions, other);
+        today.set(LocalDate.of(2026, 11, 5));
+        service.generateDueOccurrences();
+
+        assertEquals(other, service.recurringTemplates().getFirst().details().categoryId());
+        assertEquals(spotify.id(), service.recurringTemplates().getFirst().id());
+        assertEquals(List.of(LocalDate.of(2026, 9, 5), LocalDate.of(2026, 10, 5), LocalDate.of(2026, 11, 5)),
+                datesIn(other));
+    }
+
+    @Test
+    void aCategoryUsedOnlyByATemplateStillNeedsAReplacement() {
+        long subscriptions = category(TransactionType.EXPENSE, "SUBSCRIPTIONS");
+        service.createRecurringTemplate(monthly(TransactionType.EXPENSE, subscriptions, 16_900, "Spotify", 5,
+                LocalDate.of(2026, 11, 1)));
+
+        assertTrue(service.needsReplacement(subscriptions));
+        assertFalse(service.needsReplacement(category(TransactionType.EXPENSE, "HEALTH")));
+        InvalidCategoryException error = assertThrows(InvalidCategoryException.class,
+                () -> service.deleteCategory(subscriptions));
+        assertEquals(InvalidCategoryException.Problem.REPLACEMENT_REQUIRED, error.problem());
+    }
+
+    @Test
+    void aTemplateIsRefusedWhenItsInputDoesNotMakeSense() {
+        LocalDate start = LocalDate.of(2026, 11, 1);
+        assertRefused(InvalidRecurringTemplateException.Problem.UNKNOWN_CATEGORY,
+                monthly(TransactionType.EXPENSE, 9_999, 100, "", 1, start));
+        assertRefused(InvalidRecurringTemplateException.Problem.CATEGORY_OF_OTHER_TYPE,
+                monthly(TransactionType.EXPENSE, salary, 100, "", 1, start));
+        assertRefused(InvalidRecurringTemplateException.Problem.AMOUNT_NOT_POSITIVE,
+                monthly(TransactionType.EXPENSE, rent, 0, "", 1, start));
+        assertRefused(InvalidRecurringTemplateException.Problem.AMOUNT_NOT_POSITIVE,
+                monthly(TransactionType.EXPENSE, rent, -100, "", 1, start));
+        assertRefused(InvalidRecurringTemplateException.Problem.DAY_OUT_OF_RANGE,
+                monthly(TransactionType.EXPENSE, rent, 100, "", 0, start));
+        assertRefused(InvalidRecurringTemplateException.Problem.DAY_OUT_OF_RANGE,
+                monthly(TransactionType.EXPENSE, rent, 100, "", 32, start));
+        assertRefused(InvalidRecurringTemplateException.Problem.END_BEFORE_START,
+                new RecurringTemplateDetails(TransactionType.EXPENSE, rent, Money.ofHalere(100), "",
+                        Frequency.MONTHLY, 1, start, Optional.of(start.minusDays(1))));
+
+        assertEquals(List.of(), service.recurringTemplates());
+    }
+
+    private void assertRefused(InvalidRecurringTemplateException.Problem problem, RecurringTemplateDetails details) {
+        InvalidRecurringTemplateException error = assertThrows(InvalidRecurringTemplateException.class,
+                () -> service.createRecurringTemplate(details));
+        assertEquals(problem, error.problem());
     }
 
     private static RecurringTemplateDetails monthly(TransactionType type, long categoryId, long halere, String note,
