@@ -207,7 +207,8 @@ class EurTransactionScenarioTest {
 
     private BudgetService serviceOn(LocalDate today) {
         return new BudgetService(new InMemorySettingsRepository(), categories, transactions,
-                new InMemoryRecurringTemplateRepository(), rateCache, cnb, Clock.fixed(today));
+                new InMemoryRecurringTemplateRepository(),
+                new InMemoryBudgetLimitRepository(), rateCache, cnb, Clock.fixed(today));
     }
 
     private Conversion convert(OriginalAmount amount, LocalDate date, Optional<Money> chargedAmount) {

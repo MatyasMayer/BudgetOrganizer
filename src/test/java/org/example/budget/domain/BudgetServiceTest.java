@@ -13,7 +13,7 @@ class BudgetServiceTest {
     private final BudgetService service = new BudgetService(
             settings, new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
             new InMemoryRecurringTemplateRepository(),
-            Clock.fixed(LocalDate.of(2026, 10, 17)));
+            new InMemoryBudgetLimitRepository(), Clock.fixed(LocalDate.of(2026, 10, 17)));
 
     @Test
     void theCurrentMonthComesFromTheClock() {
@@ -32,7 +32,7 @@ class BudgetServiceTest {
         BudgetService afterRestart = new BudgetService(
                 settings, new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
                 new InMemoryRecurringTemplateRepository(),
-                Clock.fixed(LocalDate.of(2026, 11, 2)));
+                new InMemoryBudgetLimitRepository(), Clock.fixed(LocalDate.of(2026, 11, 2)));
 
         assertEquals(Money.ofHalere(5_000_000), afterRestart.openingSavings());
     }

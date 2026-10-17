@@ -1,6 +1,7 @@
 package org.example.budget.ui;
 
 import org.example.budget.domain.Frequency;
+import org.example.budget.domain.InvalidBudgetLimitException;
 import org.example.budget.domain.InvalidCategoryException;
 import org.example.budget.domain.InvalidRecurringTemplateException;
 import org.example.budget.domain.InvalidTransactionException;
@@ -92,6 +93,15 @@ class MessagesTest {
             }
             for (InvalidRecurringTemplateException.Problem problem : InvalidRecurringTemplateException.Problem.values()) {
                 Messages.bundle(locale).getString(Messages.recurringProblemKey(problem));
+            }
+        }
+    }
+
+    @Test
+    void everyRefusedBudgetLimitHasAMessageInBothLanguages() {
+        for (Locale locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("cs"))) {
+            for (InvalidBudgetLimitException.Problem problem : InvalidBudgetLimitException.Problem.values()) {
+                Messages.bundle(locale).getString(Messages.budgetLimitProblemKey(problem));
             }
         }
     }

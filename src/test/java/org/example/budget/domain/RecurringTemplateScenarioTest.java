@@ -21,7 +21,7 @@ class RecurringTemplateScenarioTest {
 
     private final BudgetService service = new BudgetService(
             new InMemorySettingsRepository(), new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
-            new InMemoryRecurringTemplateRepository(), today::get);
+            new InMemoryRecurringTemplateRepository(), new InMemoryBudgetLimitRepository(), today::get);
 
     private long rent;
     private long salary;
