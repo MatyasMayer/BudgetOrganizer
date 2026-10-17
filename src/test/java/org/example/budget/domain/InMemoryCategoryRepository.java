@@ -26,4 +26,16 @@ public class InMemoryCategoryRepository implements CategoryRepository {
     public List<Category> findAll() {
         return List.copyOf(categories);
     }
+
+    @Override
+    public void rename(long id, String name) {
+        categories.replaceAll(category -> category.id() == id
+                ? new Category(id, name, category.type(), category.system())
+                : category);
+    }
+
+    @Override
+    public void delete(long id) {
+        categories.removeIf(category -> category.id() == id);
+    }
 }

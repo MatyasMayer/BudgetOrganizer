@@ -169,6 +169,33 @@ public abstract class TransactionRepositoryContract {
                 .withNoteContaining("steam").inMonth(Month.of(2026, 10)).inCategory(games)));
     }
 
+    @Test
+    void aMergeMovesEveryTransactionOfOneCategoryToAnotherAndKeepsTheRest() {
+        Transaction lunch = repository.add(expense(LocalDate.of(2026, 10, 1), food, 189, "Lunch"));
+        Transaction hades = repository.add(expense(LocalDate.of(2025, 3, 8), games, 600, "Steam – Hades II"));
+        Transaction sale = repository.add(expense(LocalDate.of(2026, 7, 1), games, -400, "Refund"));
+
+        repository.moveToCategory(games, food);
+
+        assertEquals(List.of(), repository.find(TransactionFilter.ALL.inCategory(games)));
+        List<Transaction> moved = repository.find(TransactionFilter.ALL.inCategory(food));
+        assertEquals(List.of(lunch.id(), sale.id(), hades.id()), moved.stream().map(Transaction::id).toList());
+        assertEquals(List.of("Lunch", "Refund", "Steam – Hades II"), moved.stream().map(Transaction::note).toList());
+        assertEquals(Money.ofHalere(-400), moved.get(1).amount());
+        assertEquals(LocalDate.of(2025, 3, 8), moved.get(2).date());
+    }
+
+    @Test
+    void aMergeLeavesOtherCategoriesAlone() {
+        Transaction pay = repository.add(new TransactionDetails(
+                LocalDate.of(2026, 10, 10), TransactionType.INCOME, salary, Money.ofHalere(3_000_000), ""));
+        repository.add(expense(LocalDate.of(2026, 10, 1), games, 600, ""));
+
+        repository.moveToCategory(games, food);
+
+        assertEquals(Optional.of(pay), repository.find(pay.id()));
+    }
+
     private static TransactionDetails expense(LocalDate date, long categoryId, long halere, String note) {
         return new TransactionDetails(date, TransactionType.EXPENSE, categoryId, Money.ofHalere(halere), note);
     }
