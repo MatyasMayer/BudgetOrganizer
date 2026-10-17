@@ -65,6 +65,28 @@ public abstract class CategoryRepositoryContract {
     }
 
     @Test
+    void aRenameChangesOnlyTheNameOfThatCategory() {
+        Category games = repository.add("Games", TransactionType.EXPENSE, false);
+        Category food = repository.add("Food", TransactionType.EXPENSE, false);
+
+        repository.rename(games.id(), "Hry a zábava");
+
+        assertEquals(List.of(new Category(games.id(), "Hry a zábava", TransactionType.EXPENSE, false), food),
+                repository.findAll());
+    }
+
+    @Test
+    void aDeletedCategoryIsGone() {
+        Category keep = repository.add("Food", TransactionType.EXPENSE, false);
+        Category remove = repository.add("Games", TransactionType.EXPENSE, false);
+
+        repository.delete(remove.id());
+
+        assertEquals(Optional.empty(), repository.find(remove.id()));
+        assertEquals(List.of(keep), repository.findAll());
+    }
+
+    @Test
     void namesKeepCzechLetters() {
         Category category = repository.add("Oblečení a dárky – žluťoučký kůň", TransactionType.EXPENSE, false);
 

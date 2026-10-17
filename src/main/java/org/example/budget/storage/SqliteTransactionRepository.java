@@ -83,6 +83,19 @@ public class SqliteTransactionRepository implements TransactionRepository {
         }
     }
 
+    @Override
+    public void moveToCategory(long fromCategoryId, long toCategoryId) {
+        try (Connection connection = database.connect();
+             PreparedStatement update = connection.prepareStatement(
+                     "UPDATE transactions SET category_id = ? WHERE category_id = ?")) {
+            update.setLong(1, toCategoryId);
+            update.setLong(2, fromCategoryId);
+            update.executeUpdate();
+        } catch (SQLException e) {
+            throw new StorageException("Cannot move Transactions of Category " + fromCategoryId, e);
+        }
+    }
+
     /**
      * Month, Category and type are filtered in SQL. The Note search runs in Java because SQLite's
      * {@code LIKE} ignores case only for ASCII letters, and Notes are often Czech.

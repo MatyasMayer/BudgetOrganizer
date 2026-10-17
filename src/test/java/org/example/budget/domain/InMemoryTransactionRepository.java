@@ -40,6 +40,17 @@ public class InMemoryTransactionRepository implements TransactionRepository {
     }
 
     @Override
+    public void moveToCategory(long fromCategoryId, long toCategoryId) {
+        transactions.replaceAll((id, transaction) -> {
+            if (transaction.categoryId() != fromCategoryId) {
+                return transaction;
+            }
+            TransactionDetails d = transaction.details();
+            return new Transaction(id, new TransactionDetails(d.date(), d.type(), toCategoryId, d.amount(), d.note()));
+        });
+    }
+
+    @Override
     public List<Transaction> find(TransactionFilter filter) {
         return transactions.values().stream()
                 .filter(filter::matches)
