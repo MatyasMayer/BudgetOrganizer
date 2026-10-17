@@ -10,7 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class BudgetServiceTest {
 
     private final InMemorySettingsRepository settings = new InMemorySettingsRepository();
-    private final BudgetService service = new BudgetService(settings, Clock.fixed(LocalDate.of(2026, 10, 17)));
+    private final BudgetService service = new BudgetService(
+            settings, new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
+            Clock.fixed(LocalDate.of(2026, 10, 17)));
 
     @Test
     void theCurrentMonthComesFromTheClock() {
@@ -26,7 +28,9 @@ class BudgetServiceTest {
     void openingSavingsAreRememberedAcrossRestarts() {
         service.setOpeningSavings(Money.ofHalere(5_000_000));
 
-        BudgetService afterRestart = new BudgetService(settings, Clock.fixed(LocalDate.of(2026, 11, 2)));
+        BudgetService afterRestart = new BudgetService(
+                settings, new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
+                Clock.fixed(LocalDate.of(2026, 11, 2)));
 
         assertEquals(Money.ofHalere(5_000_000), afterRestart.openingSavings());
     }
