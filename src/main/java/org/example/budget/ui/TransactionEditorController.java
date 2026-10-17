@@ -77,7 +77,7 @@ public class TransactionEditorController {
         TransactionEditorController controller = new TransactionEditorController(service, locale, existing);
         FXMLLoader loader = new FXMLLoader(
                 TransactionEditorController.class.getResource("view/transaction-editor.fxml"), resources);
-        loader.setControllerFactory(type -> controller);
+        loader.setController(controller);
         Parent content;
         try {
             content = loader.load();
