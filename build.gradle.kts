@@ -42,9 +42,10 @@ tasks.withType<JavaCompile> {
 }
 
 tasks.named<JavaExec>("run") {
-    // `./gradlew run -Dbudget.dataDir=...` keeps dev runs away from the real %APPDATA% data.
+    // `./gradlew run -Dbudget.dataDir=...` keeps dev runs away from the real %APPDATA% data;
+    // `-Dbudget.cnbUrl=...` points the ČNB Rate source elsewhere.
     // The UI language is chosen on first launch and in Settings.
-    listOf("budget.dataDir").forEach { name ->
+    listOf("budget.dataDir", "budget.cnbUrl").forEach { name ->
         System.getProperty(name)?.let { systemProperty(name, it) }
     }
 }

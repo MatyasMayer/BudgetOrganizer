@@ -3,6 +3,7 @@ package org.example.budget.domain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -168,6 +169,77 @@ public abstract class TransactionRepositoryContract {
 
         assertEquals(List.of(october), repository.find(TransactionFilter.ALL
                 .withNoteContaining("steam").inMonth(Month.of(2026, 10)).inCategory(games)));
+    }
+
+    @Test
+    void aEurTransactionKeepsItsOriginalAmountAndCnbRate() {
+        Conversion conversion = new Conversion(new OriginalAmount(Currency.EUR, 1_999),
+                new CnbRate(Currency.EUR, LocalDate.of(2026, 10, 16), new BigDecimal("24.325")), Optional.empty());
+        Transaction game = repository.add(TransactionDetails.converted(
+                LocalDate.of(2026, 10, 18), TransactionType.EXPENSE, games, conversion, "Steam – Hades II"));
+
+        Transaction found = repository.find(game.id()).orElseThrow();
+        assertEquals(game, found);
+        assertEquals(Optional.of(conversion), found.details().conversion());
+        assertEquals(Money.ofHalere(48_626), found.amount());
+    }
+
+    @Test
+    void aEurTransactionKeepsItsChargedAmount() {
+        Conversion conversion = new Conversion(new OriginalAmount(Currency.EUR, -500),
+                new CnbRate(Currency.EUR, LocalDate.of(2026, 10, 16), new BigDecimal("24.325")),
+                Optional.of(Money.ofHalere(-12_400)));
+        Transaction refund = repository.add(TransactionDetails.converted(
+                LocalDate.of(2026, 10, 16), TransactionType.EXPENSE, games, conversion, ""));
+
+        assertEquals(Optional.of(refund), repository.find(refund.id()));
+        assertEquals(List.of(refund), repository.find(TransactionFilter.ALL.inCategory(games)));
+    }
+
+    @Test
+    void anUpdateCanTurnAEurTransactionIntoACzkOne() {
+        Conversion conversion = new Conversion(new OriginalAmount(Currency.EUR, 1_000),
+                new CnbRate(Currency.EUR, LocalDate.of(2026, 10, 16), new BigDecimal("24.325")),
+                Optional.of(Money.ofHalere(24_500)));
+        Transaction original = repository.add(TransactionDetails.converted(
+                LocalDate.of(2026, 10, 16), TransactionType.EXPENSE, games, conversion, ""));
+
+        Transaction inCzk = new Transaction(original.id(), expense(LocalDate.of(2026, 10, 16), games, 25_000, ""));
+        repository.update(inCzk);
+
+        assertEquals(Optional.of(inCzk), repository.find(original.id()));
+        assertEquals(Optional.empty(), repository.find(original.id()).orElseThrow().details().conversion());
+    }
+
+    @Test
+    void categoryTotalsCountEurTransactionsWithTheirEffectiveCzkAmount() {
+        CnbRate rate = new CnbRate(Currency.EUR, LocalDate.of(2026, 10, 16), new BigDecimal("24.325"));
+        repository.add(TransactionDetails.converted(LocalDate.of(2026, 10, 16), TransactionType.EXPENSE, games,
+                new Conversion(new OriginalAmount(Currency.EUR, 1_999), rate, Optional.empty()), ""));
+        repository.add(TransactionDetails.converted(LocalDate.of(2026, 10, 17), TransactionType.EXPENSE, games,
+                new Conversion(new OriginalAmount(Currency.EUR, 1_000), rate, Optional.of(Money.ofHalere(25_000))),
+                ""));
+        repository.add(expense(LocalDate.of(2026, 10, 18), games, 10_000, ""));
+
+        // 486.26 (19.99 EUR at 24.325) + 250.00 (Charged Amount, not 243.25) + 100.00 CZK
+        assertEquals(List.of(new CategoryTotal(games, TransactionType.EXPENSE, Money.ofHalere(83_626))),
+                repository.categoryTotals(Month.of(2026, 10)));
+    }
+
+    @Test
+    void aMergeKeepsTheConversionOfEurTransactions() {
+        Conversion conversion = new Conversion(new OriginalAmount(Currency.EUR, 1_999),
+                new CnbRate(Currency.EUR, LocalDate.of(2026, 10, 16), new BigDecimal("24.325")),
+                Optional.of(Money.ofHalere(49_310)));
+        Transaction hades = repository.add(TransactionDetails.converted(
+                LocalDate.of(2026, 10, 16), TransactionType.EXPENSE, games, conversion, "Steam"));
+
+        repository.moveToCategory(games, food);
+
+        Transaction moved = repository.find(hades.id()).orElseThrow();
+        assertEquals(food, moved.categoryId());
+        assertEquals(Optional.of(conversion), moved.details().conversion());
+        assertEquals(Money.ofHalere(49_310), moved.amount());
     }
 
     @Test

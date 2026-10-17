@@ -46,7 +46,8 @@ public class InMemoryTransactionRepository implements TransactionRepository {
                 return transaction;
             }
             TransactionDetails d = transaction.details();
-            return new Transaction(id, new TransactionDetails(d.date(), d.type(), toCategoryId, d.amount(), d.note()));
+            return new Transaction(id, new TransactionDetails(
+                    d.date(), d.type(), toCategoryId, d.amount(), d.note(), d.conversion()));
         });
     }
 

@@ -1,4 +1,4 @@
 /**
- * ČNB client and rate lookup, implementing the domain's Rate source. Empty until the foreign-currency ticket.
+ * ČNB client and rate lookup, implementing the domain's Rate source.
  */
 package org.example.budget.currency;

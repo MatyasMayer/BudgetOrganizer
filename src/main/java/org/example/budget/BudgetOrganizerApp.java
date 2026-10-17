@@ -3,11 +3,13 @@ package org.example.budget;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.stage.Stage;
+import org.example.budget.currency.CnbRateSource;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Clock;
 import org.example.budget.domain.Language;
 import org.example.budget.storage.Database;
 import org.example.budget.storage.SqliteCategoryRepository;
+import org.example.budget.storage.SqliteCnbRateRepository;
 import org.example.budget.storage.SqliteSettingsRepository;
 import org.example.budget.storage.SqliteTransactionRepository;
 import org.example.budget.ui.FirstLaunchController;
@@ -30,6 +32,8 @@ public class BudgetOrganizerApp extends Application {
                 new SqliteSettingsRepository(database),
                 new SqliteCategoryRepository(database),
                 new SqliteTransactionRepository(database),
+                new SqliteCnbRateRepository(database),
+                CnbRateSource.overHttp(),
                 Clock.system());
 
         if (service.isFirstLaunch()) {
