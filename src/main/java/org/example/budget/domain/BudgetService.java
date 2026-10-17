@@ -26,14 +26,23 @@ public class BudgetService {
     private final TransactionRepository transactions;
     private final BudgetLimitRepository limits;
     private final Clock clock;
+    private final CnbRates cnbRates;
 
     public BudgetService(SettingsRepository settings, CategoryRepository categories,
-                         TransactionRepository transactions, BudgetLimitRepository limits, Clock clock) {
+                         TransactionRepository transactions, BudgetLimitRepository limits,
+                         CnbRateRepository rateCache, RateSource rateSource, Clock clock) {
         this.settings = settings;
         this.categories = categories;
         this.transactions = transactions;
         this.limits = limits;
         this.clock = clock;
+        this.cnbRates = new CnbRates(rateCache, rateSource, clock);
+    }
+
+    /** A service without ČNB Rates (every rate is unavailable), for scenarios that only use CZK. */
+    public BudgetService(SettingsRepository settings, CategoryRepository categories,
+                         TransactionRepository transactions, BudgetLimitRepository limits, Clock clock) {
+        this(settings, categories, transactions, limits, CnbRates.NO_CACHE, RateSource.UNAVAILABLE, clock);
     }
 
     public Month currentMonth() {
@@ -297,6 +306,21 @@ public class BudgetService {
                 .findFirst();
     }
 
+    // --- Foreign currency ---
+
+    /** The ČNB Rate for a currency on a date, from the cache or else from ČNB. Empty when unavailable. */
+    public Optional<CnbRate> cnbRate(Currency currency, LocalDate date) {
+        return cnbRates.rate(currency, date);
+    }
+
+    /**
+     * Converts an Original Amount with the ČNB Rate for the Transaction's date; an optional Charged Amount
+     * overrides the result. Empty when the rate is unavailable.
+     */
+    public Optional<Conversion> convert(OriginalAmount amount, LocalDate date, Optional<Money> chargedAmount) {
+        return cnbRate(amount.currency(), date).map(rate -> new Conversion(amount, rate, chargedAmount));
+    }
+
     // --- Month dashboard ---
 
     /**
@@ -325,7 +349,25 @@ public class BudgetService {
         byCategory.sort(Comparator
                 .comparingLong((MonthSummary.CategorySpending spending) -> spending.total().halere()).reversed()
                 .thenComparing(spending -> spending.category().name()));
-        return new MonthSummary(month, income, expenses, byCategory);
+        return new MonthSummary(month, income, expenses, byCategory, isDeficit(month, income.minus(expenses)));
+    }
+
+    // --- Deficits ---
+
+    /** Every Month with an Uncovered Deficit, oldest first, with its (negative) Leftover. */
+    public List<Deficit> uncoveredDeficits() {
+        return transactions.monthTotals().stream()
+                .filter(totals -> isDeficit(totals.month(), totals.leftover()))
+                .map(totals -> new Deficit(totals.month(), totals.leftover()))
+                .toList();
+    }
+
+    /**
+     * A Deficit is a completed Month whose Leftover is negative. It stays uncovered until Income added to
+     * that Month brings the Leftover back to zero or above. The running Month is never a Deficit.
+     */
+    private boolean isDeficit(Month month, Money leftover) {
+        return month.compareTo(currentMonth()) < 0 && leftover.halere() < 0;
     }
 
     private void validate(TransactionDetails details) {
@@ -335,7 +377,8 @@ public class BudgetService {
             throw new InvalidTransactionException(Problem.CATEGORY_OF_OTHER_TYPE);
         }
         long amount = details.amount().halere();
-        if (amount == 0) {
+        boolean zeroOriginalAmount = details.conversion().map(c -> c.originalAmount().cents() == 0).orElse(false);
+        if (amount == 0 || zeroOriginalAmount) {
             throw new InvalidTransactionException(Problem.ZERO_AMOUNT);
         }
         if (amount < 0 && details.type() == TransactionType.INCOME) {
