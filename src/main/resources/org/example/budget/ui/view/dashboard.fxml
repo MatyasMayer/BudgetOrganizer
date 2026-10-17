@@ -7,6 +7,7 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.GridPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Region?>
@@ -47,8 +48,20 @@
         </VBox>
         <VBox styleClass="dashboard-tile" HBox.hgrow="ALWAYS">
             <Label text="%dashboard.leftover" styleClass="text-muted"/>
-            <Label fx:id="leftoverTotal" styleClass="title-3"/>
+            <HBox spacing="8" alignment="BASELINE_LEFT">
+                <Label fx:id="leftoverTotal" styleClass="title-3"/>
+                <Label fx:id="deficitBadge" text="%dashboard.deficit" styleClass="deficit-badge"
+                       visible="false">
+                    <tooltip><Tooltip text="%dashboard.deficit.hint"/></tooltip>
+                </Label>
+            </HBox>
         </VBox>
+    </HBox>
+
+    <HBox fx:id="uncoveredDeficits" styleClass="deficit-list" spacing="8" alignment="CENTER_LEFT"
+          visible="false">
+        <Label text="%dashboard.uncovered-deficits" styleClass="danger"/>
+        <FlowPane fx:id="deficitLinks" hgap="4" vgap="2" HBox.hgrow="ALWAYS"/>
     </HBox>
 
     <Label text="%dashboard.by-category" styleClass="title-4"/>
