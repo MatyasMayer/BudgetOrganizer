@@ -10,6 +10,7 @@ import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Clock;
 import org.example.budget.storage.Database;
 import org.example.budget.storage.SqliteCategoryRepository;
+import org.example.budget.storage.SqliteRecurringTemplateRepository;
 import org.example.budget.storage.SqliteSettingsRepository;
 import org.example.budget.storage.SqliteTransactionRepository;
 import org.example.budget.ui.MainController;
@@ -35,6 +36,7 @@ public class BudgetOrganizerApp extends Application {
                 new SqliteSettingsRepository(database),
                 new SqliteCategoryRepository(database),
                 new SqliteTransactionRepository(database),
+                new SqliteRecurringTemplateRepository(database),
                 Clock.system());
         Locale locale = Locale.forLanguageTag(System.getProperty(LANGUAGE_PROPERTY, "en"));
         ResourceBundle messages = Messages.bundle(locale);

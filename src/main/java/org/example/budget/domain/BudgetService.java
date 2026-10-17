@@ -5,6 +5,7 @@ import org.example.budget.domain.InvalidTransactionException.Problem;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Function;
 
@@ -18,13 +19,16 @@ public class BudgetService {
     private final SettingsRepository settings;
     private final CategoryRepository categories;
     private final TransactionRepository transactions;
+    private final RecurringTemplateRepository recurringTemplates;
     private final Clock clock;
 
     public BudgetService(SettingsRepository settings, CategoryRepository categories,
-                         TransactionRepository transactions, Clock clock) {
+                         TransactionRepository transactions, RecurringTemplateRepository recurringTemplates,
+                         Clock clock) {
         this.settings = settings;
         this.categories = categories;
         this.transactions = transactions;
+        this.recurringTemplates = recurringTemplates;
         this.clock = clock;
     }
 
@@ -183,5 +187,38 @@ public class BudgetService {
         if (amount < 0 && details.type() == TransactionType.INCOME) {
             throw new InvalidTransactionException(Problem.NEGATIVE_INCOME);
         }
+    }
+
+    // --- Recurring Templates ---
+
+    /** Creates a Recurring Template in CZK; its due occurrences appear on the next generation. */
+    public RecurringTemplate createRecurringTemplate(RecurringTemplateDetails details) {
+        return recurringTemplates.add(details);
+    }
+
+    /**
+     * Generates, as Transactions, every occurrence that came due after the template's last generated one (or
+     * from its start) up to today. Run on startup and when the date changes. Each template + occurrence date is
+     * generated at most once, even if its Transaction was deleted since.
+     */
+    public void generateDueOccurrences() {
+        LocalDate today = clock.today();
+        for (RecurringTemplate template : recurringTemplates.findAll()) {
+            RecurringTemplateDetails details = template.details();
+            Optional<LocalDate> last = recurringTemplates.lastOccurrence(template.id());
+            for (LocalDate date : details.occurrencesThrough(today)) {
+                if (last.isPresent() && !date.isAfter(last.get())) {
+                    continue;
+                }
+                Transaction generated = transactions.add(new TransactionDetails(
+                        date, details.type(), details.categoryId(), details.amount(), details.note()));
+                recurringTemplates.addOccurrence(template.id(), date, generated.id());
+            }
+        }
+    }
+
+    /** All Recurring Templates in the order they were created. */
+    public List<RecurringTemplate> recurringTemplates() {
+        return recurringTemplates.findAll();
     }
 }

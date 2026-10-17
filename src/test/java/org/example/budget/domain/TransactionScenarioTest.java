@@ -17,6 +17,7 @@ class TransactionScenarioTest {
 
     private final BudgetService service = new BudgetService(
             new InMemorySettingsRepository(), new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
+            new InMemoryRecurringTemplateRepository(),
             Clock.fixed(TODAY));
 
     @Test
