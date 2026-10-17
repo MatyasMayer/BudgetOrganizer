@@ -13,4 +13,7 @@ public interface CnbRateRepository {
 
     /** Stores the rate to use for {@code date}, replacing any rate cached for that date and currency. */
     void save(LocalDate date, CnbRate rate);
+
+    /** The cached rate with the latest fixing date: the Provisional Rate used when ČNB can't be reached. */
+    Optional<CnbRate> mostRecent(Currency currency);
 }
