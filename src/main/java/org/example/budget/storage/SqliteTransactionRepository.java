@@ -1,15 +1,20 @@
 package org.example.budget.storage;
 
 import org.example.budget.domain.CategoryTotal;
+import org.example.budget.domain.CnbRate;
+import org.example.budget.domain.Conversion;
+import org.example.budget.domain.Currency;
 import org.example.budget.domain.Money;
 import org.example.budget.domain.Month;
 import org.example.budget.domain.MonthTotals;
+import org.example.budget.domain.OriginalAmount;
 import org.example.budget.domain.Transaction;
 import org.example.budget.domain.TransactionDetails;
 import org.example.budget.domain.TransactionFilter;
 import org.example.budget.domain.TransactionRepository;
 import org.example.budget.domain.TransactionType;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -23,7 +28,8 @@ import java.util.Optional;
 
 public class SqliteTransactionRepository implements TransactionRepository {
 
-    private static final String COLUMNS = "SELECT id, date, type, category_id, amount, note FROM transactions";
+    private static final String COLUMNS = "SELECT id, date, type, category_id, amount, note, original_currency,"
+            + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount FROM transactions";
 
     private final Database database;
 
@@ -35,7 +41,9 @@ public class SqliteTransactionRepository implements TransactionRepository {
     public Transaction add(TransactionDetails details) {
         try (Connection connection = database.connect();
              PreparedStatement insert = connection.prepareStatement(
-                     "INSERT INTO transactions (date, type, category_id, amount, note) VALUES (?, ?, ?, ?, ?)",
+                     "INSERT INTO transactions (date, type, category_id, amount, note, original_currency,"
+                             + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount)"
+                             + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                      Statement.RETURN_GENERATED_KEYS)) {
             bind(insert, details);
             insert.executeUpdate();
@@ -65,9 +73,11 @@ public class SqliteTransactionRepository implements TransactionRepository {
     public void update(Transaction transaction) {
         try (Connection connection = database.connect();
              PreparedStatement update = connection.prepareStatement(
-                     "UPDATE transactions SET date = ?, type = ?, category_id = ?, amount = ?, note = ? WHERE id = ?")) {
+                     "UPDATE transactions SET date = ?, type = ?, category_id = ?, amount = ?, note = ?,"
+                             + " original_currency = ?, original_amount = ?, cnb_rate = ?, cnb_rate_valid_for = ?,"
+                             + " charged_amount = ? WHERE id = ?")) {
             bind(update, transaction.details());
-            update.setLong(6, transaction.id());
+            update.setLong(11, transaction.id());
             update.executeUpdate();
         } catch (SQLException e) {
             throw new StorageException("Cannot update Transaction " + transaction.id(), e);
@@ -189,6 +199,12 @@ public class SqliteTransactionRepository implements TransactionRepository {
         statement.setLong(3, details.categoryId());
         statement.setLong(4, details.amount().halere());
         statement.setString(5, details.hasNote() ? details.note() : null);
+        Optional<Conversion> conversion = details.conversion();
+        statement.setString(6, conversion.map(c -> c.originalAmount().currency().code()).orElse(null));
+        statement.setObject(7, conversion.map(c -> c.originalAmount().cents()).orElse(null));
+        statement.setString(8, conversion.map(c -> c.cnbRate().czkPerUnit().toPlainString()).orElse(null));
+        statement.setString(9, conversion.map(c -> c.cnbRate().validFor().toString()).orElse(null));
+        statement.setObject(10, conversion.flatMap(Conversion::chargedAmount).map(Money::halere).orElse(null));
     }
 
     private static Transaction read(ResultSet row) throws SQLException {
@@ -197,6 +213,22 @@ public class SqliteTransactionRepository implements TransactionRepository {
                 TransactionType.valueOf(row.getString("type")),
                 row.getLong("category_id"),
                 Money.ofHalere(row.getLong("amount")),
-                row.getString("note")));
+                row.getString("note"),
+                readConversion(row)));
+    }
+
+    private static Optional<Conversion> readConversion(ResultSet row) throws SQLException {
+        String code = row.getString("original_currency");
+        if (code == null) {
+            return Optional.empty();
+        }
+        Currency currency = Currency.valueOf(code);
+        long charged = row.getLong("charged_amount");
+        Optional<Money> chargedAmount = row.wasNull() ? Optional.empty() : Optional.of(Money.ofHalere(charged));
+        return Optional.of(new Conversion(
+                new OriginalAmount(currency, row.getLong("original_amount")),
+                new CnbRate(currency, LocalDate.parse(row.getString("cnb_rate_valid_for")),
+                        new BigDecimal(row.getString("cnb_rate"))),
+                chargedAmount));
     }
 }

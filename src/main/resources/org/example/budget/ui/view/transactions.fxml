@@ -37,6 +37,8 @@
             <TableColumn fx:id="categoryColumn" text="%transactions.column.category" prefWidth="150"/>
             <TableColumn fx:id="amountColumn" text="%transactions.column.amount" prefWidth="140"
                          style="-fx-alignment: CENTER-RIGHT;"/>
+            <TableColumn fx:id="originalColumn" text="%transactions.column.original" prefWidth="130"
+                         style="-fx-alignment: CENTER-RIGHT;"/>
             <TableColumn fx:id="noteColumn" text="%transactions.column.note" prefWidth="300"/>
         </columns>
     </TableView>

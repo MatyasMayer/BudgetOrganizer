@@ -66,6 +66,8 @@ public class TransactionsController {
     @FXML
     private TableColumn<Transaction, String> amountColumn;
     @FXML
+    private TableColumn<Transaction, String> originalColumn;
+    @FXML
     private TableColumn<Transaction, String> noteColumn;
     @FXML
     private Label summary;
@@ -103,6 +105,7 @@ public class TransactionsController {
         typeColumn.setCellValueFactory(row -> text(typeLabel(row.getValue())));
         categoryColumn.setCellValueFactory(row -> text(categoryName(row.getValue().categoryId())));
         amountColumn.setCellValueFactory(row -> text(row.getValue().amount().format(locale)));
+        originalColumn.setCellValueFactory(row -> text(originalAmount(row.getValue())));
         noteColumn.setCellValueFactory(row -> text(row.getValue().note()));
         table.setRowFactory(view -> {
             TableRow<Transaction> row = new TableRow<>();
@@ -210,6 +213,16 @@ public class TransactionsController {
         return transaction.isRefund()
                 ? resources.getString("transactions.refund")
                 : resources.getString(Messages.typeKey(transaction.type()));
+    }
+
+    /** Marks a EUR Transaction with its Original Amount, e.g. "EUR 19.99", and whether a Charged Amount was used. */
+    private String originalAmount(Transaction transaction) {
+        return transaction.details().conversion()
+                .map(c -> c.chargedAmount().isPresent()
+                        ? MessageFormat.format(resources.getString("transactions.original.charged"),
+                                c.originalAmount().format(locale))
+                        : c.originalAmount().format(locale))
+                .orElse("");
     }
 
     private String categoryName(long id) {
