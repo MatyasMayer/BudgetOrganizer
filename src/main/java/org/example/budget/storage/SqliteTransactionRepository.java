@@ -3,6 +3,7 @@ package org.example.budget.storage;
 import org.example.budget.domain.CategoryTotal;
 import org.example.budget.domain.Money;
 import org.example.budget.domain.Month;
+import org.example.budget.domain.MonthTotals;
 import org.example.budget.domain.Transaction;
 import org.example.budget.domain.TransactionDetails;
 import org.example.budget.domain.TransactionFilter;
@@ -15,6 +16,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -158,6 +160,26 @@ public class SqliteTransactionRepository implements TransactionRepository {
             return totals;
         } catch (SQLException e) {
             throw new StorageException("Cannot total the Categories of " + month, e);
+        }
+    }
+
+    @Override
+    public List<MonthTotals> monthTotals() {
+        try (Connection connection = database.connect();
+             PreparedStatement query = connection.prepareStatement(
+                     "SELECT substr(date, 1, 7) AS month,"
+                             + " SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END) AS income,"
+                             + " SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END) AS expenses"
+                             + " FROM transactions GROUP BY month ORDER BY month");
+             ResultSet result = query.executeQuery()) {
+            List<MonthTotals> totals = new ArrayList<>();
+            while (result.next()) {
+                totals.add(new MonthTotals(new Month(YearMonth.parse(result.getString("month"))),
+                        Money.ofHalere(result.getLong("income")), Money.ofHalere(result.getLong("expenses"))));
+            }
+            return totals;
+        } catch (SQLException e) {
+            throw new StorageException("Cannot total the Months", e);
         }
     }
 

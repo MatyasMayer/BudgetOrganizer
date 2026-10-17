@@ -229,7 +229,25 @@ public class BudgetService {
         byCategory.sort(Comparator
                 .comparingLong((MonthSummary.CategorySpending spending) -> spending.total().halere()).reversed()
                 .thenComparing(spending -> spending.category().name()));
-        return new MonthSummary(month, income, expenses, byCategory);
+        return new MonthSummary(month, income, expenses, byCategory, isDeficit(month, income.minus(expenses)));
+    }
+
+    // --- Deficits ---
+
+    /** Every Month with an Uncovered Deficit, oldest first, with its (negative) Leftover. */
+    public List<Deficit> uncoveredDeficits() {
+        return transactions.monthTotals().stream()
+                .filter(totals -> isDeficit(totals.month(), totals.leftover()))
+                .map(totals -> new Deficit(totals.month(), totals.leftover()))
+                .toList();
+    }
+
+    /**
+     * A Deficit is a completed Month whose Leftover is negative. It stays uncovered until Income added to
+     * that Month brings the Leftover back to zero or above. The running Month is never a Deficit.
+     */
+    private boolean isDeficit(Month month, Money leftover) {
+        return month.compareTo(currentMonth()) < 0 && leftover.halere() < 0;
     }
 
     private void validate(TransactionDetails details) {

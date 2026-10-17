@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 
 /** In-memory fake of {@link TransactionRepository}, kept faithful by {@code TransactionRepositoryContract}. */
 public class InMemoryTransactionRepository implements TransactionRepository {
@@ -65,6 +66,21 @@ public class InMemoryTransactionRepository implements TransactionRepository {
             totals.merge(transaction.categoryId(),
                     new CategoryTotal(transaction.categoryId(), transaction.type(), transaction.amount()),
                     (sum, more) -> new CategoryTotal(sum.categoryId(), sum.type(), sum.total().plus(more.total())));
+        }
+        return List.copyOf(totals.values());
+    }
+
+    @Override
+    public List<MonthTotals> monthTotals() {
+        Map<Month, MonthTotals> totals = new TreeMap<>();
+        for (Transaction transaction : transactions.values()) {
+            Month month = Month.of(transaction.date());
+            boolean income = transaction.type() == TransactionType.INCOME;
+            Money amount = transaction.amount();
+            totals.merge(month,
+                    new MonthTotals(month, income ? amount : Money.ZERO, income ? Money.ZERO : amount),
+                    (sum, more) -> new MonthTotals(month, sum.income().plus(more.income()),
+                            sum.expenses().plus(more.expenses())));
         }
         return List.copyOf(totals.values());
     }
