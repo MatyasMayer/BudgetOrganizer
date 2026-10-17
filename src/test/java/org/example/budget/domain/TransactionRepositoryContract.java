@@ -10,7 +10,9 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The shared suite every {@link TransactionRepository} must pass (in-memory fake and SQLite).
@@ -194,6 +196,25 @@ public abstract class TransactionRepositoryContract {
 
         assertEquals(Optional.of(refund), repository.find(refund.id()));
         assertEquals(List.of(refund), repository.find(TransactionFilter.ALL.inCategory(games)));
+    }
+
+    @Test
+    void aEurTransactionKeepsWhetherItUsesAProvisionalRate() {
+        CnbRate rate = new CnbRate(Currency.EUR, LocalDate.of(2026, 10, 16), new BigDecimal("24.325"));
+        Conversion provisional = Conversion.provisional(new OriginalAmount(Currency.EUR, 1_999), rate, Optional.empty());
+        Transaction game = repository.add(TransactionDetails.converted(
+                LocalDate.of(2026, 10, 19), TransactionType.EXPENSE, games, provisional, ""));
+
+        assertTrue(repository.find(game.id()).orElseThrow().details().conversion().orElseThrow().provisionalRate());
+
+        Conversion replaced = new Conversion(new OriginalAmount(Currency.EUR, 1_999),
+                new CnbRate(Currency.EUR, LocalDate.of(2026, 10, 19), new BigDecimal("24.3")), Optional.empty());
+        Transaction refreshed = new Transaction(game.id(), TransactionDetails.converted(
+                LocalDate.of(2026, 10, 19), TransactionType.EXPENSE, games, replaced, ""));
+        repository.update(refreshed);
+
+        assertEquals(Optional.of(refreshed), repository.find(game.id()));
+        assertFalse(repository.find(game.id()).orElseThrow().details().conversion().orElseThrow().provisionalRate());
     }
 
     @Test

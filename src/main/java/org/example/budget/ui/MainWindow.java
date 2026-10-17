@@ -6,6 +6,7 @@ import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -31,6 +32,7 @@ public class MainWindow {
     private final Stage stage;
     private final BudgetService service;
     private final Path databaseFile;
+    /** The controller of the UI currently shown. */
     private MainController controller;
     private LocalDate today;
 
@@ -47,12 +49,21 @@ public class MainWindow {
                 : new PrimerLight().getUserAgentStylesheet());
     }
 
-    /** Opens the window in the saved language and theme, on the Dashboard. */
+    /**
+     * Opens the window in the saved language and theme, on the Dashboard, then refreshes Provisional Rates in
+     * the background (it needs the network) and reloads the screen if any Transaction was recalculated.
+     */
     public void show() {
         applyTheme(service.theme());
         today = service.today();
         load(Screen.DASHBOARD);
         stage.show();
+        Thread.ofVirtual().start(() -> {
+            int refreshed = service.refreshProvisionalRates();
+            if (refreshed > 0) {
+                Platform.runLater(() -> load(controller.selected()));
+            }
+        });
         watchForDayChange();
     }
 
@@ -120,5 +131,6 @@ public class MainWindow {
             stage.getScene().setRoot(root);
         }
         controller.select(screen);
+        this.controller = controller;
     }
 }

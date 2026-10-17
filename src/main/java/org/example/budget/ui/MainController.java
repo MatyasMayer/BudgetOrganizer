@@ -49,7 +49,7 @@ public class MainController {
         navigation.getSelectionModel().select(screen);
     }
 
-    /** The screen shown now. */
+    /** The screen currently shown. */
     public Screen selected() {
         return navigation.getSelectionModel().getSelectedItem();
     }

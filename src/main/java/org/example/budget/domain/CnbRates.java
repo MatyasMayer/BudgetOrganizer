@@ -22,6 +22,11 @@ final class CnbRates {
         @Override
         public void save(LocalDate date, CnbRate rate) {
         }
+
+        @Override
+        public Optional<CnbRate> mostRecent(Currency currency) {
+            return Optional.empty();
+        }
     };
 
     private final CnbRateRepository cache;
@@ -47,5 +52,11 @@ final class CnbRates {
             }
         });
         return fetched;
+    }
+
+    /** The ČNB Rate for the date if it can be had, else the most recent cached rate as a Provisional Rate. */
+    Optional<AvailableRate> rateToUse(Currency currency, LocalDate date) {
+        return rate(currency, date).map(rate -> new AvailableRate(rate, false))
+                .or(() -> cache.mostRecent(currency).map(rate -> new AvailableRate(rate, true)));
     }
 }

@@ -2,6 +2,8 @@ package org.example.budget.domain;
 
 import org.example.budget.domain.InvalidTransactionException.Problem;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -328,11 +330,67 @@ public class BudgetService {
     }
 
     /**
+     * The rate a Transaction on the date can use: the ČNB Rate, or when ČNB can't be reached the most recent
+     * cached rate as a Provisional Rate. Empty when not even a cached rate exists.
+     */
+    public Optional<AvailableRate> rateToUse(Currency currency, LocalDate date) {
+        return cnbRates.rateToUse(currency, date);
+    }
+
+    /**
      * Converts an Original Amount with the ČNB Rate for the Transaction's date; an optional Charged Amount
-     * overrides the result. Empty when the rate is unavailable.
+     * overrides the result. When ČNB can't be reached, the most recent cached rate is used as a Provisional
+     * Rate. With no rate at all, a Charged Amount is still enough (its implied rate is the Provisional Rate).
+     * Empty when there is neither a rate nor a Charged Amount: the user has to enter one of them.
      */
     public Optional<Conversion> convert(OriginalAmount amount, LocalDate date, Optional<Money> chargedAmount) {
-        return cnbRate(amount.currency(), date).map(rate -> new Conversion(amount, rate, chargedAmount));
+        return rateToUse(amount.currency(), date)
+                .map(rate -> rate.convert(amount, chargedAmount))
+                .or(() -> chargedAmount.flatMap(charged -> impliedRate(amount, charged, date))
+                        .map(rate -> Conversion.provisional(amount, rate, chargedAmount)));
+    }
+
+    /** Converts at a rate the user entered (CZK per unit) because no ČNB Rate was available: a Provisional Rate. */
+    public Conversion convertAtRate(OriginalAmount amount, LocalDate date, BigDecimal czkPerUnit,
+                                    Optional<Money> chargedAmount) {
+        return Conversion.provisional(amount, new CnbRate(amount.currency(), date, czkPerUnit), chargedAmount);
+    }
+
+    /**
+     * Replaces every Provisional Rate whose ČNB Rate can now be fetched and recalculates the CZK amount.
+     * Transactions with a Charged Amount are left untouched. Stops at the first rate still unavailable, since
+     * ČNB is then most likely unreachable. Returns how many Transactions were updated.
+     */
+    public int refreshProvisionalRates() {
+        int refreshed = 0;
+        for (Transaction transaction : transactions.find(TransactionFilter.ALL)) {
+            Optional<Conversion> conversion = transaction.details().conversion();
+            if (conversion.isEmpty() || !conversion.get().provisionalRate()
+                    || conversion.get().chargedAmount().isPresent()) {
+                continue;
+            }
+            Conversion old = conversion.get();
+            Optional<CnbRate> rate = cnbRate(old.originalAmount().currency(), transaction.date());
+            if (rate.isEmpty()) {
+                break;
+            }
+            TransactionDetails d = transaction.details();
+            transactions.update(new Transaction(transaction.id(), TransactionDetails.converted(d.date(), d.type(),
+                    d.categoryId(), new Conversion(old.originalAmount(), rate.get(), Optional.empty()), d.note())));
+            refreshed++;
+        }
+        return refreshed;
+    }
+
+    private static Optional<CnbRate> impliedRate(OriginalAmount amount, Money charged, LocalDate date) {
+        if (amount.cents() == 0) {
+            return Optional.empty();
+        }
+        BigDecimal czkPerUnit = BigDecimal.valueOf(charged.halere())
+                .divide(BigDecimal.valueOf(amount.cents()), 6, RoundingMode.HALF_UP);
+        return czkPerUnit.signum() > 0
+                ? Optional.of(new CnbRate(amount.currency(), date, czkPerUnit))
+                : Optional.empty();
     }
 
     // --- Month dashboard ---
