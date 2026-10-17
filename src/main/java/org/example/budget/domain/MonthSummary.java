@@ -5,9 +5,11 @@ import java.util.Objects;
 
 /**
  * What the Month dashboard shows for one Month: total Income, total Expenses (Refunds subtracted), the
- * Leftover, and the Expenses per Category, largest first.
+ * Leftover, the Expenses per Category, largest first, and whether the Month is an Uncovered Deficit (a completed
+ * Month whose Leftover is negative).
  */
-public record MonthSummary(Month month, Money income, Money expenses, List<CategorySpending> expensesByCategory) {
+public record MonthSummary(Month month, Money income, Money expenses, List<CategorySpending> expensesByCategory,
+                           boolean deficit) {
 
     public MonthSummary {
         Objects.requireNonNull(month);

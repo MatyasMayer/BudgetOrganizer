@@ -29,6 +29,23 @@
 .chart-pie.default-color6, .pie-legend-symbol.default-color6 { -fx-pie-color: #6250d6; -fx-background-color: #6250d6; }
 .chart-pie.default-color7, .pie-legend-symbol.default-color7 { -fx-pie-color: #8a8a85; -fx-background-color: #8a8a85; }
 
+/* Deficits: a completed Month whose Leftover is negative. */
+.deficit-badge {
+    -fx-padding: 2 8 2 8;
+    -fx-background-color: -color-danger-emphasis;
+    -fx-background-radius: 4;
+    -fx-text-fill: -color-fg-emphasis;
+    -fx-font-weight: bold;
+}
+
+.deficit-list {
+    -fx-padding: 8 12 8 12;
+    -fx-background-color: -color-danger-subtle;
+    -fx-background-radius: 6;
+    -fx-border-color: -color-danger-muted;
+    -fx-border-radius: 6;
+}
+
 .category-swatch {
     -fx-min-width: 10;
     -fx-min-height: 10;
