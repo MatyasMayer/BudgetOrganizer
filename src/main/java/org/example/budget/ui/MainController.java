@@ -58,10 +58,25 @@ public class MainController {
 
     private void show(Screen screen) {
         try {
-            Node view = FXMLLoader.load(screen.view(), resources);
+            FXMLLoader loader = new FXMLLoader(screen.view(), resources);
+            loader.setControllerFactory(this::createController);
+            Node view = loader.load();
             content.getChildren().setAll(view);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot load view for " + screen, e);
+        }
+    }
+
+    /** Screen Controllers take {@code (BudgetService, Locale)} when they need the Model, else nothing. */
+    private Object createController(Class<?> type) {
+        try {
+            try {
+                return type.getConstructor(BudgetService.class, Locale.class).newInstance(service, locale);
+            } catch (NoSuchMethodException withoutModel) {
+                return type.getConstructor().newInstance();
+            }
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Cannot create controller " + type, e);
         }
     }
 }
