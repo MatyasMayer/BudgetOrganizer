@@ -1,12 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<!-- Placeholder View; filled in by a later ticket. -->
-<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" spacing="8">
-    <padding><Insets top="24" right="24" bottom="24" left="24"/></padding>
-    <Label text="%screen.comparison" styleClass="title-2"/>
-    <Label text="%screen.placeholder" styleClass="text-muted"/>
-</VBox>
+<ScrollPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="org.example.budget.ui.ComparisonController" fitToWidth="true"
+            styleClass="edge-to-edge" stylesheets="@comparison.css">
+    <VBox spacing="16">
+        <padding><Insets top="24" right="24" bottom="24" left="24"/></padding>
+
+        <Label text="%screen.comparison" styleClass="title-2"/>
+
+        <HBox spacing="8" alignment="CENTER_LEFT">
+            <Button text="‹" onAction="#previousMonth" accessibleText="%dashboard.month.previous">
+                <tooltip><Tooltip text="%dashboard.month.previous"/></tooltip>
+            </Button>
+            <Label fx:id="monthTitle" styleClass="title-3" minWidth="180" alignment="CENTER"/>
+            <Button text="›" onAction="#nextMonth" accessibleText="%dashboard.month.next">
+                <tooltip><Tooltip text="%dashboard.month.next"/></tooltip>
+            </Button>
+            <Button text="%dashboard.month.current" onAction="#currentMonth"/>
+        </HBox>
+
+        <VBox fx:id="sections" spacing="24"/>
+    </VBox>
+</ScrollPane>

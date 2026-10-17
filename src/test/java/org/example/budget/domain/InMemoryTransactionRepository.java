@@ -1,5 +1,6 @@
 package org.example.budget.domain;
 
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,6 +65,20 @@ public class InMemoryTransactionRepository implements TransactionRepository {
     public List<CategoryTotal> categoryTotals(Month month) {
         Map<Long, CategoryTotal> totals = new LinkedHashMap<>();
         for (Transaction transaction : find(TransactionFilter.ALL.inMonth(month))) {
+            totals.merge(transaction.categoryId(),
+                    new CategoryTotal(transaction.categoryId(), transaction.type(), transaction.amount()),
+                    (sum, more) -> new CategoryTotal(sum.categoryId(), sum.type(), sum.total().plus(more.total())));
+        }
+        return List.copyOf(totals.values());
+    }
+
+    @Override
+    public List<CategoryTotal> categoryTotals(LocalDate from, LocalDate through) {
+        Map<Long, CategoryTotal> totals = new LinkedHashMap<>();
+        for (Transaction transaction : transactions.values()) {
+            if (transaction.date().isBefore(from) || transaction.date().isAfter(through)) {
+                continue;
+            }
             totals.merge(transaction.categoryId(),
                     new CategoryTotal(transaction.categoryId(), transaction.type(), transaction.amount()),
                     (sum, more) -> new CategoryTotal(sum.categoryId(), sum.type(), sum.total().plus(more.total())));
