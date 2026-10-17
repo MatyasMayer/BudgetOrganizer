@@ -215,11 +215,17 @@ public class TransactionsController {
                 : resources.getString(Messages.typeKey(transaction.type()));
     }
 
-    /** Marks a EUR Transaction with its Original Amount, e.g. "EUR 19.99", and whether a Charged Amount was used. */
+    /**
+     * Marks a EUR Transaction with its Original Amount, e.g. "EUR 19.99", and whether a Charged Amount was used
+     * or it still uses a Provisional Rate (a Charged Amount is final, so it isn't marked provisional).
+     */
     private String originalAmount(Transaction transaction) {
         return transaction.details().conversion()
                 .map(c -> c.chargedAmount().isPresent()
                         ? MessageFormat.format(resources.getString("transactions.original.charged"),
+                                c.originalAmount().format(locale))
+                        : c.provisionalRate()
+                        ? MessageFormat.format(resources.getString("transactions.original.provisional"),
                                 c.originalAmount().format(locale))
                         : c.originalAmount().format(locale))
                 .orElse("");

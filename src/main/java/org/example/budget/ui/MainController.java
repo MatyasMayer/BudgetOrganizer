@@ -49,6 +49,11 @@ public class MainController {
         navigation.getSelectionModel().select(screen);
     }
 
+    /** The screen currently shown. */
+    public Screen selected() {
+        return navigation.getSelectionModel().getSelectedItem();
+    }
+
     @FXML
     private void initialize() {
         currentMonth.setText(service.currentMonth().firstDay()

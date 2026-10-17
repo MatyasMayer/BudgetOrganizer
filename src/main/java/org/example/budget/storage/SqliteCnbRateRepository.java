@@ -28,14 +28,32 @@ public class SqliteCnbRateRepository implements CnbRateRepository {
             query.setString(1, date.toString());
             query.setString(2, currency.code());
             try (ResultSet result = query.executeQuery()) {
-                return result.next()
-                        ? Optional.of(new CnbRate(currency, LocalDate.parse(result.getString("valid_for")),
-                                new BigDecimal(result.getString("czk_per_unit"))))
-                        : Optional.empty();
+                return result.next() ? Optional.of(read(currency, result)) : Optional.empty();
             }
         } catch (SQLException e) {
             throw new StorageException("Cannot read the cached " + currency + " rate for " + date, e);
         }
+    }
+
+    /** ISO dates sort as text, so the latest fixing has the greatest {@code valid_for}. */
+    @Override
+    public Optional<CnbRate> mostRecent(Currency currency) {
+        try (Connection connection = database.connect();
+             PreparedStatement query = connection.prepareStatement(
+                     "SELECT valid_for, czk_per_unit FROM cnb_rates WHERE currency = ?"
+                             + " ORDER BY valid_for DESC LIMIT 1")) {
+            query.setString(1, currency.code());
+            try (ResultSet result = query.executeQuery()) {
+                return result.next() ? Optional.of(read(currency, result)) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new StorageException("Cannot read the most recent cached " + currency + " rate", e);
+        }
+    }
+
+    private static CnbRate read(Currency currency, ResultSet row) throws SQLException {
+        return new CnbRate(currency, LocalDate.parse(row.getString("valid_for")),
+                new BigDecimal(row.getString("czk_per_unit")));
     }
 
     @Override

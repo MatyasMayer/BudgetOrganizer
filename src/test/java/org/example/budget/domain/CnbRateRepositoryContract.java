@@ -64,4 +64,28 @@ public abstract class CnbRateRepositoryContract {
 
         assertEquals(Optional.of(corrected), repository.find(Currency.EUR, FRIDAY));
     }
+
+    @Test
+    void withNothingCachedThereIsNoMostRecentRate() {
+        assertEquals(Optional.empty(), repository.mostRecent(Currency.EUR));
+    }
+
+    @Test
+    void theMostRecentRateIsTheOneWithTheLatestFixing() {
+        CnbRate thursday = new CnbRate(Currency.EUR, FRIDAY.minusDays(1), new BigDecimal("24.41"));
+        repository.save(SATURDAY, FRIDAY_EUR);
+        repository.save(FRIDAY.minusDays(1), thursday);
+
+        assertEquals(Optional.of(FRIDAY_EUR), repository.mostRecent(Currency.EUR));
+    }
+
+    @Test
+    void theMostRecentRateComparesFixingDatesAcrossYearsAndMonths() {
+        CnbRate december = new CnbRate(Currency.EUR, LocalDate.of(2025, 12, 31), new BigDecimal("25.1"));
+        CnbRate january = new CnbRate(Currency.EUR, LocalDate.of(2026, 1, 2), new BigDecimal("24.9"));
+        repository.save(january.validFor(), january);
+        repository.save(december.validFor(), december);
+
+        assertEquals(Optional.of(january), repository.mostRecent(Currency.EUR));
+    }
 }
