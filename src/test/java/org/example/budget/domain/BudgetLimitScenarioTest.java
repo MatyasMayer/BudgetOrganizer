@@ -191,6 +191,51 @@ class BudgetLimitScenarioTest {
         assertEquals(Optional.of(czk(5_000)), service.effectiveLimit(id("FOOD"), OCTOBER));
     }
 
+    @Test
+    void deletingACategoryMovesItsBudgetLimitsToTheReplacementExceptWhereItHasItsOwn() {
+        long food = id("FOOD");
+        long other = id("OTHER_EXPENSE");
+        service.setDefaultLimit(food, czk(6_000));
+        service.setLimitOverride(food, OCTOBER, czk(7_000));
+        service.setLimitOverride(food, DECEMBER, czk(9_000));
+        service.setDefaultLimit(other, czk(2_000));
+        service.setLimitOverride(other, OCTOBER, czk(1_500));
+        expense(LocalDate.of(2026, 10, 3), "FOOD", 1_000);
+
+        service.deleteCategory(food, other);
+
+        assertEquals(Optional.of(czk(2_000)), service.defaultLimit(other));
+        assertEquals(Optional.of(czk(1_500)), service.limitOverride(other, OCTOBER));
+        assertEquals(Optional.of(czk(9_000)), service.limitOverride(other, DECEMBER));
+        assertEquals(Optional.of(czk(2_000)), service.effectiveLimit(other, NOVEMBER));
+        assertEquals(Optional.empty(), service.effectiveLimit(food, DECEMBER));
+    }
+
+    @Test
+    void aReplacementWithoutLimitsTakesOverAllOfThem() {
+        long food = id("FOOD");
+        long other = id("OTHER_EXPENSE");
+        service.setDefaultLimit(food, czk(6_000));
+        service.setLimitOverride(food, DECEMBER, czk(9_000));
+
+        service.deleteCategory(food, other);
+
+        assertEquals(Optional.of(czk(6_000)), service.effectiveLimit(other, NOVEMBER));
+        assertEquals(Optional.of(czk(9_000)), service.effectiveLimit(other, DECEMBER));
+        assertEquals(Optional.of(czk(6_000)), spending(OCTOBER, "OTHER_EXPENSE").limit());
+    }
+
+    @Test
+    void aDeletedCategoryWithoutTransactionsTakesItsBudgetLimitsWithIt() {
+        Category pets = service.addCategory("Pets", TransactionType.EXPENSE);
+        service.setDefaultLimit(pets.id(), czk(800));
+
+        service.deleteCategory(pets.id());
+
+        assertEquals(Optional.empty(), service.effectiveLimit(pets.id(), OCTOBER));
+        assertEquals(List.of(), service.monthSummary(OCTOBER).expensesByCategory());
+    }
+
     private BudgetBarStatus barWhenSpent(Transaction transaction, Money amount) {
         TransactionDetails d = transaction.details();
         service.editTransaction(transaction.id(),

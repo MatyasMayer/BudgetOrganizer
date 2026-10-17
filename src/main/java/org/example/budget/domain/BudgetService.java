@@ -124,6 +124,7 @@ public class BudgetService {
         if (hasTransactions(id)) {
             throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_REQUIRED);
         }
+        deleteBudgetLimits(id);
         categories.delete(id);
     }
 
@@ -140,7 +141,23 @@ public class BudgetService {
             throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_OF_OTHER_TYPE);
         }
         transactions.moveToCategory(id, replacementId);
+        moveBudgetLimits(id, replacementId);
         categories.delete(id);
+    }
+
+    /** The replacement takes over the deleted Category's Budget Limits, keeping its own where it has one. */
+    private void moveBudgetLimits(long fromCategoryId, long toCategoryId) {
+        List<Optional<Month>> taken = limits.findByCategory(toCategoryId).stream().map(BudgetLimit::month).toList();
+        for (BudgetLimit limit : limits.findByCategory(fromCategoryId)) {
+            if (!taken.contains(limit.month())) {
+                limits.save(new BudgetLimit(toCategoryId, limit.month(), limit.amount()));
+            }
+        }
+        deleteBudgetLimits(fromCategoryId);
+    }
+
+    private void deleteBudgetLimits(long categoryId) {
+        limits.findByCategory(categoryId).forEach(limit -> limits.delete(categoryId, limit.month()));
     }
 
     private Category deletable(long id) {
