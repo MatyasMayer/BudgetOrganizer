@@ -2,7 +2,10 @@ package org.example.budget.ui;
 
 import org.example.budget.domain.InvalidCategoryException;
 import org.example.budget.domain.InvalidTransactionException;
+import org.example.budget.domain.Language;
 import org.example.budget.domain.PresetCategory;
+import org.example.budget.domain.PresetCategoryNames;
+import org.example.budget.domain.Theme;
 import org.example.budget.domain.TransactionType;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +50,27 @@ class MessagesTest {
         }
         assertEquals("Z úspor", Messages.bundle(Locale.forLanguageTag("cs"))
                 .getString(Messages.presetCategoryKey(PresetCategory.FROM_SAVINGS)));
+    }
+
+    @Test
+    void presetCategoryNamesComeFromTheChosenLanguage() {
+        PresetCategoryNames names = Messages.presetCategoryNames();
+
+        assertEquals("Z úspor", names.name(PresetCategory.FROM_SAVINGS, Language.CZECH));
+        assertEquals("From Savings", names.name(PresetCategory.FROM_SAVINGS, Language.ENGLISH));
+    }
+
+    @Test
+    void everyLanguageAndThemeHasANameInBothLanguages() {
+        for (Language bundleLanguage : Language.values()) {
+            ResourceBundle bundle = Messages.bundle(bundleLanguage.locale());
+            for (Language language : Language.values()) {
+                bundle.getString(Messages.languageKey(language));
+            }
+            for (Theme theme : Theme.values()) {
+                bundle.getString(Messages.themeKey(theme));
+            }
+        }
     }
 
     @Test

@@ -42,6 +42,41 @@ public class BudgetService {
         settings.save(OPENING_SAVINGS, Long.toString(amount.halere()));
     }
 
+    // --- Settings and first launch ---
+
+    private static final String LANGUAGE = "language";
+    private static final String THEME = "theme";
+
+    /** True until the first-launch dialog has been completed on this database. */
+    public boolean isFirstLaunch() {
+        return settings.find(LANGUAGE).isEmpty();
+    }
+
+    /** Remembers the language chosen on first launch and creates the preset Categories named in it. */
+    public void completeFirstLaunch(Language language, PresetCategoryNames names) {
+        seedPresetCategories(preset -> names.name(preset, language));
+        setLanguage(language);
+    }
+
+    /** The UI language; English until one is chosen. */
+    public Language language() {
+        return settings.find(LANGUAGE).flatMap(Language::fromTag).orElse(Language.ENGLISH);
+    }
+
+    /** Changes the UI language. Existing Category names stay as they are. */
+    public void setLanguage(Language language) {
+        settings.save(LANGUAGE, language.tag());
+    }
+
+    /** The UI theme; light until one is chosen. */
+    public Theme theme() {
+        return settings.find(THEME).map(Theme::valueOf).orElse(Theme.LIGHT);
+    }
+
+    public void setTheme(Theme theme) {
+        settings.save(THEME, theme.name());
+    }
+
     // --- Categories ---
 
     /** On first start (no Categories yet), creates the preset Categories named in the chosen language. */
