@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="org.example.budget.ui.MainController"
+            prefWidth="1100" prefHeight="720">
+    <left>
+        <VBox spacing="12" prefWidth="220">
+            <padding><Insets top="16" right="8" bottom="16" left="8"/></padding>
+            <VBox spacing="2">
+                <padding><Insets left="8"/></padding>
+                <Label text="%app.title" styleClass="title-3"/>
+                <Label fx:id="currentMonth" styleClass="text-muted"/>
+            </VBox>
+            <ListView fx:id="navigation" VBox.vgrow="ALWAYS"/>
+        </VBox>
+    </left>
+    <center>
+        <StackPane fx:id="content"/>
+    </center>
+</BorderPane>
