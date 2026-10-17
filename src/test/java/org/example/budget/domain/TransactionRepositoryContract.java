@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -167,6 +168,30 @@ public abstract class TransactionRepositoryContract {
 
         assertEquals(List.of(october), repository.find(TransactionFilter.ALL
                 .withNoteContaining("steam").inMonth(Month.of(2026, 10)).inCategory(games)));
+    }
+
+    @Test
+    void categoryTotalsSumEachCategoryOfTheMonthIncludingRefunds() {
+        repository.add(expense(LocalDate.of(2026, 10, 1), food, 30_000, ""));
+        repository.add(expense(LocalDate.of(2026, 10, 31), food, -5_050, "Refund"));
+        repository.add(expense(LocalDate.of(2026, 10, 8), games, 99_900, ""));
+        repository.add(new TransactionDetails(
+                LocalDate.of(2026, 10, 10), TransactionType.INCOME, salary, Money.ofHalere(3_000_000), ""));
+        repository.add(expense(LocalDate.of(2026, 9, 30), food, 1, ""));
+        repository.add(expense(LocalDate.of(2026, 11, 1), games, 2, ""));
+
+        assertEquals(Set.of(
+                        new CategoryTotal(food, TransactionType.EXPENSE, Money.ofHalere(24_950)),
+                        new CategoryTotal(games, TransactionType.EXPENSE, Money.ofHalere(99_900)),
+                        new CategoryTotal(salary, TransactionType.INCOME, Money.ofHalere(3_000_000))),
+                Set.copyOf(repository.categoryTotals(Month.of(2026, 10))));
+    }
+
+    @Test
+    void categoryTotalsOfAMonthWithoutTransactionsAreEmpty() {
+        repository.add(expense(LocalDate.of(2026, 10, 1), food, 100, ""));
+
+        assertEquals(List.of(), repository.categoryTotals(Month.of(2026, 8)));
     }
 
     @Test

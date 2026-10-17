@@ -3,6 +3,8 @@ package org.example.budget.domain;
 import org.example.budget.domain.InvalidTransactionException.Problem;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.OptionalLong;
@@ -203,6 +205,31 @@ public class BudgetService {
         return transactions.find(TransactionFilter.ALL.inMonth(month).inCategory(categoryId)).stream()
                 .map(Transaction::amount)
                 .reduce(Money.ZERO, Money::plus);
+    }
+
+    // --- Month dashboard ---
+
+    /**
+     * The Month's total Income, total Expenses, Leftover and Expenses per Category (largest first,
+     * then by name). Refunds lower their Category's total and the total Expenses.
+     */
+    public MonthSummary monthSummary(Month month) {
+        Money income = Money.ZERO;
+        Money expenses = Money.ZERO;
+        List<MonthSummary.CategorySpending> byCategory = new ArrayList<>();
+        for (CategoryTotal total : transactions.categoryTotals(month)) {
+            if (total.type() == TransactionType.INCOME) {
+                income = income.plus(total.total());
+            } else {
+                expenses = expenses.plus(total.total());
+                categories.find(total.categoryId()).ifPresent(category ->
+                        byCategory.add(new MonthSummary.CategorySpending(category, total.total())));
+            }
+        }
+        byCategory.sort(Comparator
+                .comparingLong((MonthSummary.CategorySpending spending) -> spending.total().halere()).reversed()
+                .thenComparing(spending -> spending.category().name()));
+        return new MonthSummary(month, income, expenses, byCategory);
     }
 
     private void validate(TransactionDetails details) {

@@ -1,6 +1,8 @@
 package org.example.budget.storage;
 
+import org.example.budget.domain.CategoryTotal;
 import org.example.budget.domain.Money;
+import org.example.budget.domain.Month;
 import org.example.budget.domain.Transaction;
 import org.example.budget.domain.TransactionDetails;
 import org.example.budget.domain.TransactionFilter;
@@ -134,6 +136,28 @@ public class SqliteTransactionRepository implements TransactionRepository {
             return list;
         } catch (SQLException e) {
             throw new StorageException("Cannot list Transactions", e);
+        }
+    }
+
+    @Override
+    public List<CategoryTotal> categoryTotals(Month month) {
+        try (Connection connection = database.connect();
+             PreparedStatement query = connection.prepareStatement(
+                     "SELECT category_id, type, SUM(amount) AS total FROM transactions"
+                             + " WHERE date BETWEEN ? AND ? GROUP BY category_id, type")) {
+            query.setString(1, month.firstDay().toString());
+            query.setString(2, month.lastDay().toString());
+            List<CategoryTotal> totals = new ArrayList<>();
+            try (ResultSet result = query.executeQuery()) {
+                while (result.next()) {
+                    totals.add(new CategoryTotal(result.getLong("category_id"),
+                            TransactionType.valueOf(result.getString("type")),
+                            Money.ofHalere(result.getLong("total"))));
+                }
+            }
+            return totals;
+        } catch (SQLException e) {
+            throw new StorageException("Cannot total the Categories of " + month, e);
         }
     }
 
