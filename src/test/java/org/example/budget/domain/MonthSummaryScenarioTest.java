@@ -16,7 +16,7 @@ class MonthSummaryScenarioTest {
 
     private final BudgetService service = new BudgetService(
             new InMemorySettingsRepository(), new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
-            Clock.fixed(TODAY));
+            new InMemoryBudgetLimitRepository(), Clock.fixed(TODAY));
 
     @BeforeEach
     void seed() {

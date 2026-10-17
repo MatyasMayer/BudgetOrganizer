@@ -20,7 +20,7 @@ class SettingsScenarioTest {
 
     private BudgetService startApp() {
         return new BudgetService(settings, categories, new InMemoryTransactionRepository(),
-                Clock.fixed(LocalDate.of(2026, 10, 17)));
+                new InMemoryBudgetLimitRepository(), Clock.fixed(LocalDate.of(2026, 10, 17)));
     }
 
     @Test

@@ -17,7 +17,7 @@ class TransactionScenarioTest {
 
     private final BudgetService service = new BudgetService(
             new InMemorySettingsRepository(), new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
-            Clock.fixed(TODAY));
+            new InMemoryBudgetLimitRepository(), Clock.fixed(TODAY));
 
     @Test
     void firstStartSeedsThePresetCategoriesInTheChosenLanguage() {

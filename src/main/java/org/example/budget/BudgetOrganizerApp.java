@@ -8,6 +8,7 @@ import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Clock;
 import org.example.budget.domain.Language;
 import org.example.budget.storage.Database;
+import org.example.budget.storage.SqliteBudgetLimitRepository;
 import org.example.budget.storage.SqliteCategoryRepository;
 import org.example.budget.storage.SqliteCnbRateRepository;
 import org.example.budget.storage.SqliteSettingsRepository;
@@ -32,6 +33,7 @@ public class BudgetOrganizerApp extends Application {
                 new SqliteSettingsRepository(database),
                 new SqliteCategoryRepository(database),
                 new SqliteTransactionRepository(database),
+                new SqliteBudgetLimitRepository(database),
                 new SqliteCnbRateRepository(database),
                 CnbRateSource.overHttp(),
                 Clock.system());

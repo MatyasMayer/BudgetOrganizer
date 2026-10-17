@@ -288,6 +288,28 @@ public abstract class TransactionRepositoryContract {
     }
 
     @Test
+    void monthTotalsSumIncomeAndExpensesPerMonthOldestFirstIncludingRefunds() {
+        repository.add(expense(LocalDate.of(2026, 10, 31), food, 30_000, ""));
+        repository.add(expense(LocalDate.of(2026, 10, 1), games, -5_050, "Refund"));
+        repository.add(new TransactionDetails(
+                LocalDate.of(2026, 10, 10), TransactionType.INCOME, salary, Money.ofHalere(3_000_000), ""));
+        repository.add(expense(LocalDate.of(2025, 12, 31), food, 1, ""));
+        repository.add(new TransactionDetails(
+                LocalDate.of(2026, 2, 1), TransactionType.INCOME, salary, Money.ofHalere(7), ""));
+
+        assertEquals(List.of(
+                        new MonthTotals(Month.of(2025, 12), Money.ZERO, Money.ofHalere(1)),
+                        new MonthTotals(Month.of(2026, 2), Money.ofHalere(7), Money.ZERO),
+                        new MonthTotals(Month.of(2026, 10), Money.ofHalere(3_000_000), Money.ofHalere(24_950))),
+                repository.monthTotals());
+    }
+
+    @Test
+    void monthTotalsOfAnEmptyRepositoryAreEmpty() {
+        assertEquals(List.of(), repository.monthTotals());
+    }
+
+    @Test
     void aMergeMovesEveryTransactionOfOneCategoryToAnotherAndKeepsTheRest() {
         Transaction lunch = repository.add(expense(LocalDate.of(2026, 10, 1), food, 189, "Lunch"));
         Transaction hades = repository.add(expense(LocalDate.of(2025, 3, 8), games, 600, "Steam – Hades II"));

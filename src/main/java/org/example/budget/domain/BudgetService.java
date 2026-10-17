@@ -7,8 +7,11 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Function;
@@ -23,23 +26,25 @@ public class BudgetService {
     private final SettingsRepository settings;
     private final CategoryRepository categories;
     private final TransactionRepository transactions;
+    private final BudgetLimitRepository limits;
     private final Clock clock;
     private final CnbRates cnbRates;
 
     public BudgetService(SettingsRepository settings, CategoryRepository categories,
-                         TransactionRepository transactions, CnbRateRepository rateCache, RateSource rateSource,
-                         Clock clock) {
+                         TransactionRepository transactions, BudgetLimitRepository limits,
+                         CnbRateRepository rateCache, RateSource rateSource, Clock clock) {
         this.settings = settings;
         this.categories = categories;
         this.transactions = transactions;
+        this.limits = limits;
         this.clock = clock;
         this.cnbRates = new CnbRates(rateCache, rateSource, clock);
     }
 
     /** A service without ČNB Rates (every rate is unavailable), for scenarios that only use CZK. */
     public BudgetService(SettingsRepository settings, CategoryRepository categories,
-                         TransactionRepository transactions, Clock clock) {
-        this(settings, categories, transactions, CnbRates.NO_CACHE, RateSource.UNAVAILABLE, clock);
+                         TransactionRepository transactions, BudgetLimitRepository limits, Clock clock) {
+        this(settings, categories, transactions, limits, CnbRates.NO_CACHE, RateSource.UNAVAILABLE, clock);
     }
 
     public Month currentMonth() {
@@ -130,6 +135,7 @@ public class BudgetService {
         if (hasTransactions(id)) {
             throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_REQUIRED);
         }
+        deleteBudgetLimits(id);
         categories.delete(id);
     }
 
@@ -146,7 +152,23 @@ public class BudgetService {
             throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_OF_OTHER_TYPE);
         }
         transactions.moveToCategory(id, replacementId);
+        moveBudgetLimits(id, replacementId);
         categories.delete(id);
+    }
+
+    /** The replacement takes over the deleted Category's Budget Limits, keeping its own where it has one. */
+    private void moveBudgetLimits(long fromCategoryId, long toCategoryId) {
+        List<Optional<Month>> taken = limits.findByCategory(toCategoryId).stream().map(BudgetLimit::month).toList();
+        for (BudgetLimit limit : limits.findByCategory(fromCategoryId)) {
+            if (!taken.contains(limit.month())) {
+                limits.save(new BudgetLimit(toCategoryId, limit.month(), limit.amount()));
+            }
+        }
+        deleteBudgetLimits(fromCategoryId);
+    }
+
+    private void deleteBudgetLimits(long categoryId) {
+        limits.findByCategory(categoryId).forEach(limit -> limits.delete(categoryId, limit.month()));
     }
 
     private Category deletable(long id) {
@@ -217,6 +239,73 @@ public class BudgetService {
         return transactions.find(TransactionFilter.ALL.inMonth(month).inCategory(categoryId)).stream()
                 .map(Transaction::amount)
                 .reduce(Money.ZERO, Money::plus);
+    }
+
+    // --- Budget Limits ---
+
+    /** Sets the Budget Limit an Expense Category has in every Month that has no Limit Override. */
+    public void setDefaultLimit(long categoryId, Money amount) {
+        validateLimit(categoryId, amount);
+        limits.save(BudgetLimit.defaultLimit(categoryId, amount));
+    }
+
+    public void clearDefaultLimit(long categoryId) {
+        limits.delete(categoryId, Optional.empty());
+    }
+
+    /** Sets the Budget Limit an Expense Category has in one Month instead of its Default Limit. */
+    public void setLimitOverride(long categoryId, Month month, Money amount) {
+        validateLimit(categoryId, amount);
+        limits.save(BudgetLimit.override(categoryId, month, amount));
+    }
+
+    /** Removes the Month's Limit Override, so the Category falls back to its Default Limit there. */
+    public void clearLimitOverride(long categoryId, Month month) {
+        limits.delete(categoryId, Optional.of(month));
+    }
+
+    public Optional<Money> defaultLimit(long categoryId) {
+        return limit(categoryId, Optional.empty());
+    }
+
+    public Optional<Money> limitOverride(long categoryId, Month month) {
+        return limit(categoryId, Optional.of(month));
+    }
+
+    /** The Month's Limit Override if there is one, otherwise the Default Limit, otherwise no limit. */
+    public Optional<Money> effectiveLimit(long categoryId, Month month) {
+        return limitOverride(categoryId, month).or(() -> defaultLimit(categoryId));
+    }
+
+    /** Each limited Category's effective limit in the Month: its Limit Override, else its Default Limit. */
+    private Map<Long, Money> effectiveLimits(Month month) {
+        Map<Long, Money> effective = new HashMap<>();
+        for (BudgetLimit limit : limits.findFor(month)) {
+            if (limit.isDefault()) {
+                effective.putIfAbsent(limit.categoryId(), limit.amount());
+            } else {
+                effective.put(limit.categoryId(), limit.amount());
+            }
+        }
+        return effective;
+    }
+
+    private void validateLimit(long categoryId, Money amount) {
+        Category category = categories.find(categoryId).orElseThrow(
+                () -> new InvalidBudgetLimitException(InvalidBudgetLimitException.Problem.UNKNOWN_CATEGORY));
+        if (category.type() != TransactionType.EXPENSE) {
+            throw new InvalidBudgetLimitException(InvalidBudgetLimitException.Problem.INCOME_CATEGORY);
+        }
+        if (amount.halere() <= 0) {
+            throw new InvalidBudgetLimitException(InvalidBudgetLimitException.Problem.NOT_POSITIVE);
+        }
+    }
+
+    private Optional<Money> limit(long categoryId, Optional<Month> month) {
+        return limits.findByCategory(categoryId).stream()
+                .filter(limit -> limit.month().equals(month))
+                .map(BudgetLimit::amount)
+                .findFirst();
     }
 
     // --- Foreign currency ---
@@ -294,25 +383,49 @@ public class BudgetService {
 
     /**
      * The Month's total Income, total Expenses, Leftover and Expenses per Category (largest first,
-     * then by name). Refunds lower their Category's total and the total Expenses.
+     * then by name). Refunds lower their Category's total and the total Expenses. Each Category carries
+     * its effective Budget Limit, and a limited Category is listed even when nothing was spent in it yet.
      */
     public MonthSummary monthSummary(Month month) {
+        Map<Long, Money> effectiveLimits = effectiveLimits(month);
         Money income = Money.ZERO;
         Money expenses = Money.ZERO;
-        List<MonthSummary.CategorySpending> byCategory = new ArrayList<>();
+        Map<Long, Money> spent = new LinkedHashMap<>();
         for (CategoryTotal total : transactions.categoryTotals(month)) {
             if (total.type() == TransactionType.INCOME) {
                 income = income.plus(total.total());
             } else {
                 expenses = expenses.plus(total.total());
-                categories.find(total.categoryId()).ifPresent(category ->
-                        byCategory.add(new MonthSummary.CategorySpending(category, total.total())));
+                spent.put(total.categoryId(), total.total());
             }
         }
+        effectiveLimits.keySet().forEach(categoryId -> spent.putIfAbsent(categoryId, Money.ZERO));
+        List<MonthSummary.CategorySpending> byCategory = new ArrayList<>();
+        spent.forEach((categoryId, total) -> categories.find(categoryId).ifPresent(category ->
+                byCategory.add(new MonthSummary.CategorySpending(
+                        category, total, Optional.ofNullable(effectiveLimits.get(categoryId))))));
         byCategory.sort(Comparator
                 .comparingLong((MonthSummary.CategorySpending spending) -> spending.total().halere()).reversed()
                 .thenComparing(spending -> spending.category().name()));
-        return new MonthSummary(month, income, expenses, byCategory);
+        return new MonthSummary(month, income, expenses, byCategory, isDeficit(month, income.minus(expenses)));
+    }
+
+    // --- Deficits ---
+
+    /** Every Month with an Uncovered Deficit, oldest first, with its (negative) Leftover. */
+    public List<Deficit> uncoveredDeficits() {
+        return transactions.monthTotals().stream()
+                .filter(totals -> isDeficit(totals.month(), totals.leftover()))
+                .map(totals -> new Deficit(totals.month(), totals.leftover()))
+                .toList();
+    }
+
+    /**
+     * A Deficit is a completed Month whose Leftover is negative. It stays uncovered until Income added to
+     * that Month brings the Leftover back to zero or above. The running Month is never a Deficit.
+     */
+    private boolean isDeficit(Month month, Money leftover) {
+        return month.compareTo(currentMonth()) < 0 && leftover.halere() < 0;
     }
 
     private void validate(TransactionDetails details) {
