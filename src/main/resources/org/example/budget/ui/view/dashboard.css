@@ -53,3 +53,8 @@
     -fx-max-height: 10;
     -fx-background-radius: 2;
 }
+
+/* Budget Limit bars: green below 80 %, orange from 80 % to 100 %, red above the limit. */
+.budget-bar-green { -fx-accent: -color-success-emphasis; }
+.budget-bar-orange { -fx-accent: -color-warning-emphasis; }
+.budget-bar-red { -fx-accent: -color-danger-emphasis; }
