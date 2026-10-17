@@ -1,30 +1,25 @@
 package org.example.budget;
 
-import atlantafx.base.theme.PrimerLight;
 import javafx.application.Application;
-import javafx.fxml.FXMLLoader;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
+import javafx.application.Platform;
 import javafx.stage.Stage;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Clock;
+import org.example.budget.domain.Language;
 import org.example.budget.storage.Database;
 import org.example.budget.storage.SqliteCategoryRepository;
 import org.example.budget.storage.SqliteSettingsRepository;
 import org.example.budget.storage.SqliteTransactionRepository;
-import org.example.budget.ui.MainController;
+import org.example.budget.ui.FirstLaunchController;
+import org.example.budget.ui.MainWindow;
 import org.example.budget.ui.Messages;
 
-import java.util.Locale;
-import java.util.ResourceBundle;
+import java.util.Optional;
 
 /** The application bootstrap: wires the real implementations together and opens the main window. */
 public class BudgetOrganizerApp extends Application {
 
     private static final System.Logger LOG = System.getLogger(BudgetOrganizerApp.class.getName());
-
-    /** Development override of the UI language, e.g. {@code -Dbudget.lang=cs}; English by default. */
-    private static final String LANGUAGE_PROPERTY = "budget.lang";
 
     @Override
     public void start(Stage stage) throws Exception {
@@ -36,23 +31,17 @@ public class BudgetOrganizerApp extends Application {
                 new SqliteCategoryRepository(database),
                 new SqliteTransactionRepository(database),
                 Clock.system());
-        Locale locale = Locale.forLanguageTag(System.getProperty(LANGUAGE_PROPERTY, "en"));
-        ResourceBundle messages = Messages.bundle(locale);
-        service.seedPresetCategories(preset -> messages.getString(Messages.presetCategoryKey(preset)));
 
-        Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
-
-        FXMLLoader loader = new FXMLLoader(MainController.class.getResource("view/main.fxml"), messages);
-        loader.setControllerFactory(type -> {
-            if (type == MainController.class) {
-                return new MainController(service, locale);
+        if (service.isFirstLaunch()) {
+            MainWindow.applyTheme(service.theme());
+            Optional<Language> language = FirstLaunchController.open();
+            if (language.isEmpty()) {
+                Platform.exit();
+                return;
             }
-            throw new IllegalArgumentException("Unknown controller " + type);
-        });
-        Parent root = loader.load();
+            service.completeFirstLaunch(language.get(), Messages.presetCategoryNames());
+        }
 
-        stage.setTitle(messages.getString("app.title"));
-        stage.setScene(new Scene(root));
-        stage.show();
+        new MainWindow(stage, service, database.file()).show();
     }
 }

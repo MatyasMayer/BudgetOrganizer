@@ -14,6 +14,7 @@ import java.io.UncheckedIOException;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.ResourceBundle;
+import java.util.function.Function;
 
 /** The main window: a navigation sidebar that swaps the screen shown in the content area. */
 public class MainController {
@@ -30,9 +31,22 @@ public class MainController {
     @FXML
     private StackPane content;
 
+    /** Creates the Controllers that need more than the Model, e.g. Settings; null for all others. */
+    private final Function<Class<?>, Object> specialControllers;
+
     public MainController(BudgetService service, Locale locale) {
+        this(service, locale, type -> null);
+    }
+
+    public MainController(BudgetService service, Locale locale, Function<Class<?>, Object> specialControllers) {
         this.service = service;
         this.locale = locale;
+        this.specialControllers = specialControllers;
+    }
+
+    /** Selects a screen in the sidebar and shows it. */
+    public void select(Screen screen) {
+        navigation.getSelectionModel().select(screen);
     }
 
     @FXML
@@ -69,6 +83,10 @@ public class MainController {
 
     /** Screen Controllers take {@code (BudgetService, Locale)} when they need the Model, else nothing. */
     private Object createController(Class<?> type) {
+        Object special = specialControllers.apply(type);
+        if (special != null) {
+            return special;
+        }
         try {
             try {
                 return type.getConstructor(BudgetService.class, Locale.class).newInstance(service, locale);
