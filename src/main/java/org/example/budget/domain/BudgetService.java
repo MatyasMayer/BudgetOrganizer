@@ -70,6 +70,44 @@ public class BudgetService {
         categories.rename(id, validName(name, category.type(), OptionalLong.of(id)));
     }
 
+    /** Whether any Transaction (in any Month) uses the Category, so deleting it needs a replacement. */
+    public boolean hasTransactions(long categoryId) {
+        return !transactions.find(TransactionFilter.ALL.inCategory(categoryId)).isEmpty();
+    }
+
+    /** Deletes a Category that has no Transactions. From Savings can't be deleted. */
+    public void deleteCategory(long id) {
+        deletable(id);
+        if (hasTransactions(id)) {
+            throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_REQUIRED);
+        }
+        categories.delete(id);
+    }
+
+    /**
+     * Deletes a Category and merges it into the replacement: all its Transactions move there.
+     * The replacement must be another Category of the same type. From Savings can't be merged away.
+     */
+    public void deleteCategory(long id, long replacementId) {
+        Category deleted = deletable(id);
+        if (replacementId == id) {
+            throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_IS_SAME);
+        }
+        if (existingCategory(replacementId).type() != deleted.type()) {
+            throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_OF_OTHER_TYPE);
+        }
+        transactions.moveToCategory(id, replacementId);
+        categories.delete(id);
+    }
+
+    private Category deletable(long id) {
+        Category category = existingCategory(id);
+        if (category.system()) {
+            throw new InvalidCategoryException(InvalidCategoryException.Problem.SYSTEM_CATEGORY);
+        }
+        return category;
+    }
+
     private Category existingCategory(long id) {
         return categories.find(id)
                 .orElseThrow(() -> new InvalidCategoryException(InvalidCategoryException.Problem.UNKNOWN_CATEGORY));

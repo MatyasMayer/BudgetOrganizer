@@ -7,7 +7,13 @@ public class InvalidCategoryException extends RuntimeException {
         BLANK_NAME,
         /** Another Category of the same type already has this name (ignoring case). */
         DUPLICATE_NAME,
-        UNKNOWN_CATEGORY
+        UNKNOWN_CATEGORY,
+        /** From Savings is needed by the Savings rules and can't be deleted or merged away. */
+        SYSTEM_CATEGORY,
+        /** The Category has Transactions, so deleting it needs a replacement to move them to. */
+        REPLACEMENT_REQUIRED,
+        REPLACEMENT_OF_OTHER_TYPE,
+        REPLACEMENT_IS_SAME
     }
 
     private final Problem problem;
