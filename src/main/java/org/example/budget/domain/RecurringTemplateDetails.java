@@ -35,6 +35,11 @@ public record RecurringTemplateDetails(
         return !note.isEmpty();
     }
 
+    /** Whether the template's end date lies before this date, so it generates nothing more. */
+    public boolean hasEndedBy(LocalDate date) {
+        return endDate.filter(end -> end.isBefore(date)).isPresent();
+    }
+
     /**
      * The occurrence dates from the start date up to and including {@code until} (or the end date, if earlier),
      * oldest first. A day of month beyond a Month's length falls on its last day.

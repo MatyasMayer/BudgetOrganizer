@@ -69,6 +69,43 @@ public class SqliteRecurringTemplateRepository implements RecurringTemplateRepos
     }
 
     @Override
+    public void update(RecurringTemplate template, LocalDate editedOn) {
+        RecurringTemplateDetails details = template.details();
+        try (Connection connection = database.connect();
+             PreparedStatement update = connection.prepareStatement(
+                     "UPDATE recurring_templates SET type = ?, category_id = ?, amount = ?, note = ?, frequency = ?,"
+                             + " day_of_month = ?, start_date = ?, end_date = ?, edited_on = ? WHERE id = ?")) {
+            update.setString(1, details.type().name());
+            update.setLong(2, details.categoryId());
+            update.setLong(3, details.amount().halere());
+            update.setString(4, details.hasNote() ? details.note() : null);
+            update.setString(5, details.frequency().name());
+            update.setInt(6, details.dayOfMonth());
+            update.setString(7, details.startDate().toString());
+            update.setString(8, details.endDate().map(LocalDate::toString).orElse(null));
+            update.setString(9, editedOn.toString());
+            update.setLong(10, template.id());
+            update.executeUpdate();
+        } catch (SQLException e) {
+            throw new StorageException("Cannot update Recurring Template " + template.id(), e);
+        }
+    }
+
+    @Override
+    public Optional<LocalDate> lastEdited(long templateId) {
+        try (Connection connection = database.connect();
+             PreparedStatement query = connection.prepareStatement(
+                     "SELECT edited_on FROM recurring_templates WHERE id = ?")) {
+            query.setLong(1, templateId);
+            try (ResultSet result = query.executeQuery()) {
+                return result.next() ? Optional.ofNullable(result.getString(1)).map(LocalDate::parse) : Optional.empty();
+            }
+        } catch (SQLException e) {
+            throw new StorageException("Cannot read Recurring Template " + templateId, e);
+        }
+    }
+
+    @Override
     public List<RecurringTemplate> findAll() {
         try (Connection connection = database.connect();
              PreparedStatement query = connection.prepareStatement(COLUMNS + " ORDER BY id");

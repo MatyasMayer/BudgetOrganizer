@@ -91,6 +91,32 @@ public abstract class RecurringTemplateRepositoryContract {
     }
 
     @Test
+    void anUpdateReplacesEveryFieldOfOnlyThatTemplateAndRemembersTheDayOfTheEdit() {
+        RecurringTemplate spotify = repository.add(spotify(subscriptions));
+        RecurringTemplate flat = repository.add(spotify(rent));
+        RecurringTemplateDetails changed = new RecurringTemplateDetails(TransactionType.INCOME, salary,
+                Money.ofHalere(19_900), "  ", Frequency.YEARLY, 31, LocalDate.of(2026, 10, 1),
+                Optional.of(LocalDate.of(2027, 1, 31)));
+
+        repository.update(new RecurringTemplate(spotify.id(), changed), LocalDate.of(2026, 10, 17));
+
+        assertEquals(Optional.of(new RecurringTemplate(spotify.id(), changed)), repository.find(spotify.id()));
+        assertEquals(Optional.of(LocalDate.of(2026, 10, 17)), repository.lastEdited(spotify.id()));
+        assertEquals(Optional.of(flat), repository.find(flat.id()));
+        assertEquals(Optional.empty(), repository.lastEdited(flat.id()));
+    }
+
+    @Test
+    void theLatestEditIsRemembered() {
+        RecurringTemplate spotify = repository.add(spotify(subscriptions));
+
+        repository.update(spotify, LocalDate.of(2026, 10, 17));
+        repository.update(spotify, LocalDate.of(2026, 12, 1));
+
+        assertEquals(Optional.of(LocalDate.of(2026, 12, 1)), repository.lastEdited(spotify.id()));
+    }
+
+    @Test
     void theLastOccurrenceIsTheLatestGeneratedDateOfThatTemplate() {
         RecurringTemplate spotify = repository.add(spotify(subscriptions));
         RecurringTemplate other = repository.add(spotify(rent));

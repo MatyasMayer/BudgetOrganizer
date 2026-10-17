@@ -16,6 +16,7 @@ public class InMemoryRecurringTemplateRepository implements RecurringTemplateRep
 
     private final Map<Long, RecurringTemplate> templates = new LinkedHashMap<>();
     private final Map<Long, TreeMap<LocalDate, Long>> occurrences = new HashMap<>();
+    private final Map<Long, LocalDate> edits = new HashMap<>();
     private long nextId = 1;
 
     @Override
@@ -28,6 +29,18 @@ public class InMemoryRecurringTemplateRepository implements RecurringTemplateRep
     @Override
     public Optional<RecurringTemplate> find(long id) {
         return Optional.ofNullable(templates.get(id));
+    }
+
+    @Override
+    public void update(RecurringTemplate template, LocalDate editedOn) {
+        if (templates.replace(template.id(), template) != null) {
+            edits.put(template.id(), editedOn);
+        }
+    }
+
+    @Override
+    public Optional<LocalDate> lastEdited(long templateId) {
+        return Optional.ofNullable(edits.get(templateId));
     }
 
     @Override
