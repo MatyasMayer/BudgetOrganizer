@@ -352,7 +352,7 @@ public class TransactionEditorController {
     }
 
     /** Shows and reads dates in the UI language, e.g. "17. 10. 2026" in Czech. */
-    private static final class LocalizedDateConverter extends StringConverter<LocalDate> {
+    static final class LocalizedDateConverter extends StringConverter<LocalDate> {
         private final DateTimeFormatter format;
 
         LocalizedDateConverter(Locale locale) {

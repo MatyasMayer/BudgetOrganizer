@@ -1,6 +1,8 @@
 package org.example.budget.ui;
 
+import org.example.budget.domain.Frequency;
 import org.example.budget.domain.InvalidCategoryException;
+import org.example.budget.domain.InvalidRecurringTemplateException;
 import org.example.budget.domain.InvalidTransactionException;
 import org.example.budget.domain.Language;
 import org.example.budget.domain.PresetCategory;
@@ -78,6 +80,18 @@ class MessagesTest {
         for (Locale locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("cs"))) {
             for (InvalidCategoryException.Problem problem : InvalidCategoryException.Problem.values()) {
                 Messages.bundle(locale).getString(Messages.categoryProblemKey(problem));
+            }
+        }
+    }
+
+    @Test
+    void everyFrequencyAndRefusedRecurringTemplateHasTextInBothLanguages() {
+        for (Locale locale : List.of(Locale.ENGLISH, Locale.forLanguageTag("cs"))) {
+            for (Frequency frequency : Frequency.values()) {
+                Messages.bundle(locale).getString(Messages.frequencyKey(frequency));
+            }
+            for (InvalidRecurringTemplateException.Problem problem : InvalidRecurringTemplateException.Problem.values()) {
+                Messages.bundle(locale).getString(Messages.recurringProblemKey(problem));
             }
         }
     }
