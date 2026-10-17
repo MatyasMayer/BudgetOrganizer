@@ -21,8 +21,8 @@ class MigrationRunnerTest {
         try (Connection connection = connect()) {
             MigrationRunner runner = MigrationRunner.forApp();
 
-            assertEquals(List.of(1, 2, 3, 4, 5, 6), runner.migrate(connection));
-            assertEquals(6, runner.currentVersion(connection));
+            assertEquals(List.of(1, 2, 3, 4, 5, 6, 7), runner.migrate(connection));
+            assertEquals(7, runner.currentVersion(connection));
         }
     }
 
@@ -34,7 +34,7 @@ class MigrationRunnerTest {
         }
         try (Connection connection = connect()) {
             assertEquals(List.of(), runner.migrate(connection));
-            assertEquals(6, runner.currentVersion(connection));
+            assertEquals(7, runner.currentVersion(connection));
         }
     }
 

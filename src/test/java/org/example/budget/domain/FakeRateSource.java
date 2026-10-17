@@ -26,6 +26,10 @@ public class FakeRateSource implements RateSource {
         offline = true;
     }
 
+    public void goOnline() {
+        offline = false;
+    }
+
     /** How many times the rate source was asked, i.e. network calls in the real app. */
     public int requests() {
         return requests;
