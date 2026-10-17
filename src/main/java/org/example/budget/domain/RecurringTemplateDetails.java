@@ -8,9 +8,12 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * What the user enters for a Recurring Template in CZK: type, Category, amount, Note, frequency, day of month,
+ * What the user enters for a Recurring Template: type, Category, amount, Note, frequency, day of month,
  * start date and optional end date. A yearly template repeats in its start date's month. A blank Note is
  * stored as no Note ({@code ""}).
+ * <p>
+ * A template in a foreign currency (e.g. a EUR Subscription) has an Original Amount instead of a CZK amount
+ * ({@code amount} is then zero): each occurrence is converted at the ČNB Rate of its own due date.
  */
 public record RecurringTemplateDetails(
         TransactionType type,
@@ -20,7 +23,8 @@ public record RecurringTemplateDetails(
         Frequency frequency,
         int dayOfMonth,
         LocalDate startDate,
-        Optional<LocalDate> endDate) {
+        Optional<LocalDate> endDate,
+        Optional<OriginalAmount> originalAmount) {
 
     public RecurringTemplateDetails {
         Objects.requireNonNull(type);
@@ -28,7 +32,38 @@ public record RecurringTemplateDetails(
         Objects.requireNonNull(frequency);
         Objects.requireNonNull(startDate);
         Objects.requireNonNull(endDate);
+        Objects.requireNonNull(originalAmount);
         note = note == null ? "" : note.strip();
+        if (originalAmount.isPresent() && !amount.equals(Money.ZERO)) {
+            throw new IllegalArgumentException("A foreign-currency template has no CZK amount: " + amount);
+        }
+    }
+
+    /** A template in CZK. */
+    public RecurringTemplateDetails(TransactionType type, long categoryId, Money amount, String note,
+                                    Frequency frequency, int dayOfMonth, LocalDate startDate,
+                                    Optional<LocalDate> endDate) {
+        this(type, categoryId, amount, note, frequency, dayOfMonth, startDate, endDate, Optional.empty());
+    }
+
+    /** A template in a foreign currency, whose occurrences are converted at their due dates' ČNB Rates. */
+    public static RecurringTemplateDetails inForeignCurrency(TransactionType type, long categoryId,
+                                                             OriginalAmount originalAmount, String note,
+                                                             Frequency frequency, int dayOfMonth,
+                                                             LocalDate startDate, Optional<LocalDate> endDate) {
+        return new RecurringTemplateDetails(type, categoryId, Money.ZERO, note, frequency, dayOfMonth, startDate,
+                endDate, Optional.of(originalAmount));
+    }
+
+    /** The currency the amount is in: CZK, or the Original Amount's currency. */
+    public Currency currency() {
+        return originalAmount.map(OriginalAmount::currency).orElse(Currency.CZK);
+    }
+
+    /** The same template in another Category. */
+    public RecurringTemplateDetails inCategory(long otherCategoryId) {
+        return new RecurringTemplateDetails(type, otherCategoryId, amount, note, frequency, dayOfMonth, startDate,
+                endDate, originalAmount);
     }
 
     public boolean hasNote() {
