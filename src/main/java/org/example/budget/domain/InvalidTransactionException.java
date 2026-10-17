@@ -9,6 +9,8 @@ public class InvalidTransactionException extends RuntimeException {
         ZERO_AMOUNT,
         /** Only an Expense may be negative (a Refund); money coming back is never a negative Income. */
         NEGATIVE_INCOME,
+        /** Only an Expense can be paid from Savings; money taken out of Savings is a From Savings Income. */
+        SAVINGS_FUNDED_INCOME,
         UNKNOWN_TRANSACTION
     }
 

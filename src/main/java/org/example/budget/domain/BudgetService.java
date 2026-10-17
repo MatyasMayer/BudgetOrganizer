@@ -68,6 +68,46 @@ public class BudgetService {
         settings.save(OPENING_SAVINGS, Long.toString(amount.halere()));
     }
 
+    // --- Savings ---
+
+    /**
+     * Opening Savings + the positive Leftovers of completed Months − all From Savings Incomes − all
+     * Savings-Funded Expenses. Always calculated from the Transactions, never stored (ADR-0003); may be negative.
+     */
+    public Money savings() {
+        Money savings = openingSavings();
+        for (MonthTotals totals : transactions.monthTotals()) {
+            if (isCompleted(totals.month()) && totals.leftover().halere() > 0) {
+                savings = savings.plus(totals.leftover());
+            }
+        }
+        for (Category fromSavings : categories(TransactionType.INCOME)) {
+            if (fromSavings.system()) {
+                for (Transaction withdrawal : transactions.find(TransactionFilter.ALL.inCategory(fromSavings.id()))) {
+                    savings = savings.minus(withdrawal.amount());
+                }
+            }
+        }
+        return savings.minus(transactions.savingsFundedTotal());
+    }
+
+    /**
+     * The warning to show after saving a Transaction: the (negative) Savings total if the saved Transaction is a
+     * Savings-Funded Expense and Savings are now below zero. It's not an error; the Transaction stays saved.
+     */
+    public Optional<Money> negativeSavingsWarning(TransactionDetails saved) {
+        if (!saved.savingsFunded()) {
+            return Optional.empty();
+        }
+        Money savings = savings();
+        return savings.halere() < 0 ? Optional.of(savings) : Optional.empty();
+    }
+
+    /** A Month before the running one. */
+    private boolean isCompleted(Month month) {
+        return month.compareTo(currentMonth()) < 0;
+    }
+
     // --- Settings and first launch ---
 
     private static final String LANGUAGE = "language";
@@ -377,7 +417,8 @@ public class BudgetService {
             }
             TransactionDetails d = transaction.details();
             transactions.update(new Transaction(transaction.id(), TransactionDetails.converted(d.date(), d.type(),
-                    d.categoryId(), new Conversion(old.originalAmount(), rate.get(), Optional.empty()), d.note())));
+                    d.categoryId(), new Conversion(old.originalAmount(), rate.get(), Optional.empty()), d.note())
+                    .withSavingsFunded(d.savingsFunded())));
             refreshed++;
         }
         return refreshed;
@@ -400,6 +441,8 @@ public class BudgetService {
      * The Month's total Income, total Expenses, Leftover and Expenses per Category (largest first,
      * then by name). Refunds lower their Category's total and the total Expenses. Each Category carries
      * its effective Budget Limit, and a limited Category is listed even when nothing was spent in it yet.
+     * Savings-Funded Expenses are left out of the Expenses, the Leftover and the Budget Limit, but each Category
+     * shows what it took from Savings, and the order counts it.
      */
     public MonthSummary monthSummary(Month month) {
         Map<Long, Money> effectiveLimits = effectiveLimits(month);
@@ -414,13 +457,19 @@ public class BudgetService {
                 spent.put(total.categoryId(), total.total());
             }
         }
+        Map<Long, Money> fromSavings = new HashMap<>();
+        for (CategoryTotal total : transactions.savingsFundedTotals(month)) {
+            fromSavings.put(total.categoryId(), total.total());
+            spent.putIfAbsent(total.categoryId(), Money.ZERO);
+        }
         effectiveLimits.keySet().forEach(categoryId -> spent.putIfAbsent(categoryId, Money.ZERO));
         List<MonthSummary.CategorySpending> byCategory = new ArrayList<>();
         spent.forEach((categoryId, total) -> categories.find(categoryId).ifPresent(category ->
                 byCategory.add(new MonthSummary.CategorySpending(
-                        category, total, Optional.ofNullable(effectiveLimits.get(categoryId))))));
+                        category, total, Optional.ofNullable(effectiveLimits.get(categoryId)),
+                        fromSavings.getOrDefault(categoryId, Money.ZERO)))));
         byCategory.sort(Comparator
-                .comparingLong((MonthSummary.CategorySpending spending) -> spending.total().halere()).reversed()
+                .comparingLong((MonthSummary.CategorySpending spending) -> spending.spent().halere()).reversed()
                 .thenComparing(spending -> spending.category().name()));
         return new MonthSummary(month, income, expenses, byCategory, isDeficit(month, income.minus(expenses)));
     }
@@ -503,6 +552,9 @@ public class BudgetService {
         }
         if (amount < 0 && details.type() == TransactionType.INCOME) {
             throw new InvalidTransactionException(Problem.NEGATIVE_INCOME);
+        }
+        if (details.savingsFunded() && details.type() == TransactionType.INCOME) {
+            throw new InvalidTransactionException(Problem.SAVINGS_FUNDED_INCOME);
         }
     }
 

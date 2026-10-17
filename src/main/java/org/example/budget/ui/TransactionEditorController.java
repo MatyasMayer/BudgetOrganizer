@@ -5,9 +5,11 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Dialog;
@@ -48,6 +50,7 @@ import java.util.ResourceBundle;
 /**
  * The Transaction editor dialog: creates a new Transaction (date defaulting to today) or edits an existing
  * one. Only Categories of the chosen type are offered. Saving goes through the service, which validates.
+ * An Expense can be marked Savings-Funded; if saving it leaves Savings below zero, a warning follows (it's saved).
  */
 public class TransactionEditorController {
 
@@ -85,6 +88,8 @@ public class TransactionEditorController {
     private ComboBox<Category> category;
     @FXML
     private TextField note;
+    @FXML
+    private CheckBox savingsFunded;
     @FXML
     private Label error;
 
@@ -142,6 +147,8 @@ public class TransactionEditorController {
         category.setCellFactory(list -> new CategoryCell());
         category.setButtonCell(new CategoryCell());
         typeGroup.selectedToggleProperty().addListener((obs, previous, selected) -> offerCategoriesOf(type()));
+        savingsFunded.managedProperty().bind(savingsFunded.visibleProperty());
+        savingsFunded.visibleProperty().bind(expenseType.selectedProperty());
         currency.getItems().setAll(Currency.values());
         currency.setConverter(new CurrencyConverter());
         foreignCurrency.managedProperty().bind(foreignCurrency.visibleProperty());
@@ -183,6 +190,7 @@ public class TransactionEditorController {
                 .findFirst()
                 .ifPresent(category.getSelectionModel()::select);
         note.setText(transaction.note());
+        savingsFunded.setSelected(transaction.details().savingsFunded());
     }
 
     private TransactionType type() {
@@ -247,10 +255,13 @@ public class TransactionEditorController {
             details = new TransactionDetails(
                     chosenDate.get(), type(), category.getValue().id(), chosenAmount.get(), note.getText());
         }
+        TransactionDetails saved = details.withSavingsFunded(type() == TransactionType.EXPENSE
+                && savingsFunded.isSelected());
         try {
             existing.ifPresentOrElse(
-                    transaction -> service.editTransaction(transaction.id(), details),
-                    () -> service.recordTransaction(details));
+                    transaction -> service.editTransaction(transaction.id(), saved),
+                    () -> service.recordTransaction(saved));
+            service.negativeSavingsWarning(saved).ifPresent(this::warnAboutNegativeSavings);
             return true;
         } catch (InvalidTransactionException e) {
             return fail(resources.getString(Messages.problemKey(e.problem())));
@@ -268,6 +279,17 @@ public class TransactionEditorController {
         } catch (DateTimeParseException e) {
             return Optional.empty();
         }
+    }
+
+    /** The Savings-Funded Expense is already saved; this only informs. */
+    private void warnAboutNegativeSavings(Money savings) {
+        Alert warning = new Alert(Alert.AlertType.WARNING);
+        warning.initOwner(error.getScene().getWindow());
+        warning.setTitle(resources.getString("editor.savings-warning.title"));
+        warning.setHeaderText(resources.getString("editor.savings-warning.header"));
+        warning.setContentText(MessageFormat.format(resources.getString("editor.savings-warning"),
+                savings.format(locale)));
+        warning.showAndWait();
     }
 
     private boolean fail(String message) {
