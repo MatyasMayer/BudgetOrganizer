@@ -81,6 +81,19 @@ class EurTransactionScenarioTest {
     }
 
     @Test
+    void theMonthSummaryCountsEurTransactionsWithTheirEffectiveCzkAmount() {
+        record(FRIDAY, convert(eur(1_999), FRIDAY, Optional.empty()), "Steam – Hades II");
+        record(SUNDAY, convert(eur(1_000), SUNDAY, Optional.of(halere(25_000))), "GOG");
+
+        MonthSummary october = service.monthSummary(Month.of(2026, 10));
+
+        // 486.26 CZK at the ČNB Rate + 250.00 CZK Charged Amount (the rate alone would give 243.25)
+        assertEquals(halere(73_626), october.expenses());
+        assertEquals(halere(73_626), october.expensesByCategory().getFirst().total());
+        assertEquals(halere(-73_626), october.leftover());
+    }
+
+    @Test
     void theOriginalAmountRateAndChargedAmountAreKeptWhenOpenedAgain() {
         Conversion conversion = convert(eur(1_999), FRIDAY, Optional.of(halere(49_310)));
         Transaction hades = record(FRIDAY, conversion, "Steam – Hades II");

@@ -2,11 +2,41 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<!-- Placeholder View; filled in by a later ticket. -->
-<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" spacing="8">
+<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+      fx:controller="org.example.budget.ui.SettingsController" spacing="20" maxWidth="640">
     <padding><Insets top="24" right="24" bottom="24" left="24"/></padding>
     <Label text="%screen.settings" styleClass="title-2"/>
-    <Label text="%screen.placeholder" styleClass="text-muted"/>
+
+    <fx:define>
+        <ToggleGroup fx:id="languageGroup"/>
+        <ToggleGroup fx:id="themeGroup"/>
+    </fx:define>
+
+    <VBox spacing="8">
+        <Label text="%settings.language" styleClass="title-4"/>
+        <HBox spacing="16">
+            <RadioButton fx:id="english" toggleGroup="$languageGroup"/>
+            <RadioButton fx:id="czech" toggleGroup="$languageGroup"/>
+        </HBox>
+        <Label text="%settings.language.hint" styleClass="text-muted" wrapText="true"/>
+    </VBox>
+
+    <VBox spacing="8">
+        <Label text="%settings.theme" styleClass="title-4"/>
+        <HBox spacing="16">
+            <RadioButton fx:id="light" toggleGroup="$themeGroup"/>
+            <RadioButton fx:id="dark" toggleGroup="$themeGroup"/>
+        </HBox>
+    </VBox>
+
+    <VBox spacing="8">
+        <Label text="%settings.database" styleClass="title-4"/>
+        <TextField fx:id="databaseFile" editable="false"/>
+    </VBox>
 </VBox>

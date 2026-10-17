@@ -1,12 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.chart.PieChart?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.DatePicker?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 
-<!-- Placeholder View; filled in by a later ticket. -->
-<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" spacing="8">
+<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+      fx:controller="org.example.budget.ui.DashboardController" spacing="16"
+      stylesheets="@dashboard.css">
     <padding><Insets top="24" right="24" bottom="24" left="24"/></padding>
-    <Label text="%screen.dashboard" styleClass="title-2"/>
-    <Label text="%screen.placeholder" styleClass="text-muted"/>
+
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <Label text="%screen.dashboard" styleClass="title-2"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button text="%transactions.new" onAction="#newTransaction"/>
+    </HBox>
+
+    <HBox spacing="8" alignment="CENTER_LEFT">
+        <Button text="‹" onAction="#previousMonth" accessibleText="%dashboard.month.previous">
+            <tooltip><Tooltip text="%dashboard.month.previous"/></tooltip>
+        </Button>
+        <Label fx:id="monthTitle" styleClass="title-3" minWidth="180" alignment="CENTER"/>
+        <Button text="›" onAction="#nextMonth" accessibleText="%dashboard.month.next">
+            <tooltip><Tooltip text="%dashboard.month.next"/></tooltip>
+        </Button>
+        <DatePicker fx:id="monthPicker" promptText="%dashboard.month.pick" prefWidth="170"/>
+        <Button text="%dashboard.month.current" onAction="#currentMonth"/>
+    </HBox>
+
+    <HBox spacing="16">
+        <VBox styleClass="dashboard-tile" HBox.hgrow="ALWAYS">
+            <Label text="%dashboard.income" styleClass="text-muted"/>
+            <Label fx:id="incomeTotal" styleClass="title-3"/>
+        </VBox>
+        <VBox styleClass="dashboard-tile" HBox.hgrow="ALWAYS">
+            <Label text="%dashboard.expenses" styleClass="text-muted"/>
+            <Label fx:id="expensesTotal" styleClass="title-3"/>
+        </VBox>
+        <VBox styleClass="dashboard-tile" HBox.hgrow="ALWAYS">
+            <Label text="%dashboard.leftover" styleClass="text-muted"/>
+            <Label fx:id="leftoverTotal" styleClass="title-3"/>
+        </VBox>
+    </HBox>
+
+    <Label text="%dashboard.by-category" styleClass="title-4"/>
+    <HBox spacing="16" VBox.vgrow="ALWAYS">
+        <StackPane HBox.hgrow="ALWAYS">
+            <PieChart fx:id="pie" legendVisible="true" labelsVisible="true" animated="false"/>
+            <Label fx:id="noExpenses" text="%dashboard.no-expenses" styleClass="text-muted"/>
+        </StackPane>
+        <ScrollPane fitToWidth="true" prefWidth="300" minWidth="260" styleClass="edge-to-edge">
+            <GridPane fx:id="categoryTable" hgap="16" vgap="6">
+                <padding><Insets top="4" right="8" bottom="4" left="8"/></padding>
+            </GridPane>
+        </ScrollPane>
+    </HBox>
 </VBox>

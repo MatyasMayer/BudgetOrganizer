@@ -1,9 +1,11 @@
 package org.example.budget.storage;
 
+import org.example.budget.domain.CategoryTotal;
 import org.example.budget.domain.CnbRate;
 import org.example.budget.domain.Conversion;
 import org.example.budget.domain.Currency;
 import org.example.budget.domain.Money;
+import org.example.budget.domain.Month;
 import org.example.budget.domain.OriginalAmount;
 import org.example.budget.domain.Transaction;
 import org.example.budget.domain.TransactionDetails;
@@ -91,6 +93,19 @@ public class SqliteTransactionRepository implements TransactionRepository {
         }
     }
 
+    @Override
+    public void moveToCategory(long fromCategoryId, long toCategoryId) {
+        try (Connection connection = database.connect();
+             PreparedStatement update = connection.prepareStatement(
+                     "UPDATE transactions SET category_id = ? WHERE category_id = ?")) {
+            update.setLong(1, toCategoryId);
+            update.setLong(2, fromCategoryId);
+            update.executeUpdate();
+        } catch (SQLException e) {
+            throw new StorageException("Cannot move Transactions of Category " + fromCategoryId, e);
+        }
+    }
+
     /**
      * Month, Category and type are filtered in SQL. The Note search runs in Java because SQLite's
      * {@code LIKE} ignores case only for ASCII letters, and Notes are often Czech.
@@ -131,6 +146,28 @@ public class SqliteTransactionRepository implements TransactionRepository {
             return list;
         } catch (SQLException e) {
             throw new StorageException("Cannot list Transactions", e);
+        }
+    }
+
+    @Override
+    public List<CategoryTotal> categoryTotals(Month month) {
+        try (Connection connection = database.connect();
+             PreparedStatement query = connection.prepareStatement(
+                     "SELECT category_id, type, SUM(amount) AS total FROM transactions"
+                             + " WHERE date BETWEEN ? AND ? GROUP BY category_id, type")) {
+            query.setString(1, month.firstDay().toString());
+            query.setString(2, month.lastDay().toString());
+            List<CategoryTotal> totals = new ArrayList<>();
+            try (ResultSet result = query.executeQuery()) {
+                while (result.next()) {
+                    totals.add(new CategoryTotal(result.getLong("category_id"),
+                            TransactionType.valueOf(result.getString("type")),
+                            Money.ofHalere(result.getLong("total"))));
+                }
+            }
+            return totals;
+        } catch (SQLException e) {
+            throw new StorageException("Cannot total the Categories of " + month, e);
         }
     }
 

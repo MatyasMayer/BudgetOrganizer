@@ -40,10 +40,33 @@ public class InMemoryTransactionRepository implements TransactionRepository {
     }
 
     @Override
+    public void moveToCategory(long fromCategoryId, long toCategoryId) {
+        transactions.replaceAll((id, transaction) -> {
+            if (transaction.categoryId() != fromCategoryId) {
+                return transaction;
+            }
+            TransactionDetails d = transaction.details();
+            return new Transaction(id, new TransactionDetails(
+                    d.date(), d.type(), toCategoryId, d.amount(), d.note(), d.conversion()));
+        });
+    }
+
+    @Override
     public List<Transaction> find(TransactionFilter filter) {
         return transactions.values().stream()
                 .filter(filter::matches)
                 .sorted(NEWEST_FIRST)
                 .toList();
+    }
+
+    @Override
+    public List<CategoryTotal> categoryTotals(Month month) {
+        Map<Long, CategoryTotal> totals = new LinkedHashMap<>();
+        for (Transaction transaction : find(TransactionFilter.ALL.inMonth(month))) {
+            totals.merge(transaction.categoryId(),
+                    new CategoryTotal(transaction.categoryId(), transaction.type(), transaction.amount()),
+                    (sum, more) -> new CategoryTotal(sum.categoryId(), sum.type(), sum.total().plus(more.total())));
+        }
+        return List.copyOf(totals.values());
     }
 }

@@ -43,8 +43,9 @@ tasks.withType<JavaCompile> {
 
 tasks.named<JavaExec>("run") {
     // `./gradlew run -Dbudget.dataDir=...` keeps dev runs away from the real %APPDATA% data;
-    // `-Dbudget.lang=cs` shows the Czech UI; `-Dbudget.cnbUrl=...` points the ČNB Rate source elsewhere.
-    listOf("budget.dataDir", "budget.lang", "budget.cnbUrl").forEach { name ->
+    // `-Dbudget.cnbUrl=...` points the ČNB Rate source elsewhere.
+    // The UI language is chosen on first launch and in Settings.
+    listOf("budget.dataDir", "budget.cnbUrl").forEach { name ->
         System.getProperty(name)?.let { systemProperty(name, it) }
     }
 }

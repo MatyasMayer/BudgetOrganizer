@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -208,6 +209,88 @@ public abstract class TransactionRepositoryContract {
 
         assertEquals(Optional.of(inCzk), repository.find(original.id()));
         assertEquals(Optional.empty(), repository.find(original.id()).orElseThrow().details().conversion());
+    }
+
+    @Test
+    void categoryTotalsCountEurTransactionsWithTheirEffectiveCzkAmount() {
+        CnbRate rate = new CnbRate(Currency.EUR, LocalDate.of(2026, 10, 16), new BigDecimal("24.325"));
+        repository.add(TransactionDetails.converted(LocalDate.of(2026, 10, 16), TransactionType.EXPENSE, games,
+                new Conversion(new OriginalAmount(Currency.EUR, 1_999), rate, Optional.empty()), ""));
+        repository.add(TransactionDetails.converted(LocalDate.of(2026, 10, 17), TransactionType.EXPENSE, games,
+                new Conversion(new OriginalAmount(Currency.EUR, 1_000), rate, Optional.of(Money.ofHalere(25_000))),
+                ""));
+        repository.add(expense(LocalDate.of(2026, 10, 18), games, 10_000, ""));
+
+        // 486.26 (19.99 EUR at 24.325) + 250.00 (Charged Amount, not 243.25) + 100.00 CZK
+        assertEquals(List.of(new CategoryTotal(games, TransactionType.EXPENSE, Money.ofHalere(83_626))),
+                repository.categoryTotals(Month.of(2026, 10)));
+    }
+
+    @Test
+    void aMergeKeepsTheConversionOfEurTransactions() {
+        Conversion conversion = new Conversion(new OriginalAmount(Currency.EUR, 1_999),
+                new CnbRate(Currency.EUR, LocalDate.of(2026, 10, 16), new BigDecimal("24.325")),
+                Optional.of(Money.ofHalere(49_310)));
+        Transaction hades = repository.add(TransactionDetails.converted(
+                LocalDate.of(2026, 10, 16), TransactionType.EXPENSE, games, conversion, "Steam"));
+
+        repository.moveToCategory(games, food);
+
+        Transaction moved = repository.find(hades.id()).orElseThrow();
+        assertEquals(food, moved.categoryId());
+        assertEquals(Optional.of(conversion), moved.details().conversion());
+        assertEquals(Money.ofHalere(49_310), moved.amount());
+    }
+
+    @Test
+    void categoryTotalsSumEachCategoryOfTheMonthIncludingRefunds() {
+        repository.add(expense(LocalDate.of(2026, 10, 1), food, 30_000, ""));
+        repository.add(expense(LocalDate.of(2026, 10, 31), food, -5_050, "Refund"));
+        repository.add(expense(LocalDate.of(2026, 10, 8), games, 99_900, ""));
+        repository.add(new TransactionDetails(
+                LocalDate.of(2026, 10, 10), TransactionType.INCOME, salary, Money.ofHalere(3_000_000), ""));
+        repository.add(expense(LocalDate.of(2026, 9, 30), food, 1, ""));
+        repository.add(expense(LocalDate.of(2026, 11, 1), games, 2, ""));
+
+        assertEquals(Set.of(
+                        new CategoryTotal(food, TransactionType.EXPENSE, Money.ofHalere(24_950)),
+                        new CategoryTotal(games, TransactionType.EXPENSE, Money.ofHalere(99_900)),
+                        new CategoryTotal(salary, TransactionType.INCOME, Money.ofHalere(3_000_000))),
+                Set.copyOf(repository.categoryTotals(Month.of(2026, 10))));
+    }
+
+    @Test
+    void categoryTotalsOfAMonthWithoutTransactionsAreEmpty() {
+        repository.add(expense(LocalDate.of(2026, 10, 1), food, 100, ""));
+
+        assertEquals(List.of(), repository.categoryTotals(Month.of(2026, 8)));
+    }
+
+    @Test
+    void aMergeMovesEveryTransactionOfOneCategoryToAnotherAndKeepsTheRest() {
+        Transaction lunch = repository.add(expense(LocalDate.of(2026, 10, 1), food, 189, "Lunch"));
+        Transaction hades = repository.add(expense(LocalDate.of(2025, 3, 8), games, 600, "Steam – Hades II"));
+        Transaction sale = repository.add(expense(LocalDate.of(2026, 7, 1), games, -400, "Refund"));
+
+        repository.moveToCategory(games, food);
+
+        assertEquals(List.of(), repository.find(TransactionFilter.ALL.inCategory(games)));
+        List<Transaction> moved = repository.find(TransactionFilter.ALL.inCategory(food));
+        assertEquals(List.of(lunch.id(), sale.id(), hades.id()), moved.stream().map(Transaction::id).toList());
+        assertEquals(List.of("Lunch", "Refund", "Steam – Hades II"), moved.stream().map(Transaction::note).toList());
+        assertEquals(Money.ofHalere(-400), moved.get(1).amount());
+        assertEquals(LocalDate.of(2025, 3, 8), moved.get(2).date());
+    }
+
+    @Test
+    void aMergeLeavesOtherCategoriesAlone() {
+        Transaction pay = repository.add(new TransactionDetails(
+                LocalDate.of(2026, 10, 10), TransactionType.INCOME, salary, Money.ofHalere(3_000_000), ""));
+        repository.add(expense(LocalDate.of(2026, 10, 1), games, 600, ""));
+
+        repository.moveToCategory(games, food);
+
+        assertEquals(Optional.of(pay), repository.find(pay.id()));
     }
 
     private static TransactionDetails expense(LocalDate date, long categoryId, long halere, String note) {
