@@ -1,5 +1,6 @@
 package org.example.budget.ui;
 
+import org.example.budget.domain.InvalidTransactionException;
 import org.example.budget.domain.PresetCategory;
 import org.example.budget.domain.TransactionType;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,9 @@ class MessagesTest {
             }
             for (TransactionType type : TransactionType.values()) {
                 bundle.getString(Messages.typeKey(type));
+            }
+            for (InvalidTransactionException.Problem problem : InvalidTransactionException.Problem.values()) {
+                bundle.getString(Messages.problemKey(problem));
             }
         }
         assertEquals("Z úspor", Messages.bundle(Locale.forLanguageTag("cs"))
