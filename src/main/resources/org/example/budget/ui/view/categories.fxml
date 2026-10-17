@@ -1,12 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<!-- Placeholder View; filled in by a later ticket. -->
-<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" spacing="8">
+<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+      fx:controller="org.example.budget.ui.CategoriesController" spacing="12">
     <padding><Insets top="24" right="24" bottom="24" left="24"/></padding>
+
     <Label text="%screen.categories" styleClass="title-2"/>
-    <Label text="%screen.placeholder" styleClass="text-muted"/>
+
+    <HBox spacing="24" VBox.vgrow="ALWAYS">
+        <VBox spacing="8" HBox.hgrow="ALWAYS">
+            <Label text="%categories.expense" styleClass="title-4"/>
+            <ListView fx:id="expenseList" VBox.vgrow="ALWAYS"/>
+            <HBox spacing="8">
+                <Button text="%categories.add" onAction="#addExpenseCategory"/>
+                <Button fx:id="renameExpense" text="%categories.rename" onAction="#renameExpenseCategory"/>
+                <Button fx:id="deleteExpense" text="%categories.delete" onAction="#deleteExpenseCategory"
+                        styleClass="danger"/>
+            </HBox>
+        </VBox>
+        <VBox spacing="8" HBox.hgrow="ALWAYS">
+            <Label text="%categories.income" styleClass="title-4"/>
+            <ListView fx:id="incomeList" VBox.vgrow="ALWAYS"/>
+            <HBox spacing="8">
+                <Button text="%categories.add" onAction="#addIncomeCategory"/>
+                <Button fx:id="renameIncome" text="%categories.rename" onAction="#renameIncomeCategory"/>
+                <Button fx:id="deleteIncome" text="%categories.delete" onAction="#deleteIncomeCategory"
+                        styleClass="danger"/>
+            </HBox>
+        </VBox>
+    </HBox>
 </VBox>

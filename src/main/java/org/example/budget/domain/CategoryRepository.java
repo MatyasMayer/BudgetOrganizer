@@ -13,4 +13,9 @@ public interface CategoryRepository {
 
     /** All Categories in the order they were added. */
     List<Category> findAll();
+
+    void rename(long id, String name);
+
+    /** Removes the Category; its Transactions must have been moved elsewhere first. */
+    void delete(long id);
 }
