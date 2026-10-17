@@ -61,6 +61,27 @@ public class BudgetService {
         settings.save(OPENING_SAVINGS, Long.toString(amount.halere()));
     }
 
+    // --- Savings ---
+
+    /**
+     * Opening Savings + the positive Leftovers of completed Months − all From Savings Incomes − all
+     * Savings-Funded Expenses. Always calculated from the Transactions, never stored (ADR-0003); may be negative.
+     */
+    public Money savings() {
+        Money savings = openingSavings();
+        for (MonthTotals totals : transactions.monthTotals()) {
+            if (isCompleted(totals.month()) && totals.leftover().halere() > 0) {
+                savings = savings.plus(totals.leftover());
+            }
+        }
+        return savings;
+    }
+
+    /** A Month before the running one. */
+    private boolean isCompleted(Month month) {
+        return month.compareTo(currentMonth()) < 0;
+    }
+
     // --- Settings and first launch ---
 
     private static final String LANGUAGE = "language";
