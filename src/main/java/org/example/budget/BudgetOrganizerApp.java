@@ -48,6 +48,7 @@ public class BudgetOrganizerApp extends Application {
             service.completeFirstLaunch(language.get(), Messages.presetCategoryNames());
         }
 
+        service.generateDueOccurrences();
         new MainWindow(stage, service, database.file()).show();
     }
 }

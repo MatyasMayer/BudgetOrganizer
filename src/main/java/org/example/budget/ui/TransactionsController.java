@@ -30,6 +30,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,6 +45,7 @@ public class TransactionsController {
     private final DateTimeFormatter monthFormat;
 
     private Map<Long, Category> categoriesById = Map.of();
+    private Set<Long> generatedIds = Set.of();
 
     @FXML
     private ResourceBundle resources;
@@ -201,6 +203,7 @@ public class TransactionsController {
                 selected(typeFilter),
                 noteSearch.getText());
         List<Transaction> found = service.transactions(filter);
+        generatedIds = service.generatedTransactionIds();
         table.getItems().setAll(found);
         summary.setText(MessageFormat.format(resources.getString("transactions.count"), found.size()));
     }
@@ -209,10 +212,14 @@ public class TransactionsController {
         return Optional.ofNullable(box.getValue()).flatMap(Function.identity());
     }
 
+    /** E.g. "Expense", "Refund", or "Expense (recurring)" for one generated from a Recurring Template. */
     private String typeLabel(Transaction transaction) {
-        return transaction.isRefund()
+        String type = transaction.isRefund()
                 ? resources.getString("transactions.refund")
                 : resources.getString(Messages.typeKey(transaction.type()));
+        return generatedIds.contains(transaction.id())
+                ? MessageFormat.format(resources.getString("transactions.generated"), type)
+                : type;
     }
 
     /** Marks a EUR Transaction with its Original Amount, e.g. "EUR 19.99", and whether a Charged Amount was used. */
