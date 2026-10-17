@@ -1,7 +1,9 @@
 package org.example.budget.ui;
 
+import org.example.budget.domain.Frequency;
 import org.example.budget.domain.InvalidBudgetLimitException;
 import org.example.budget.domain.InvalidCategoryException;
+import org.example.budget.domain.InvalidRecurringTemplateException;
 import org.example.budget.domain.InvalidTransactionException;
 import org.example.budget.domain.Language;
 import org.example.budget.domain.PresetCategory;
@@ -57,6 +59,16 @@ public final class Messages {
     /** Bundle key of the message for a refused Category change, e.g. {@code category.error.blank-name}. */
     public static String categoryProblemKey(InvalidCategoryException.Problem problem) {
         return "category.error." + problem.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /** Bundle key of the message for a rejected Recurring Template, e.g. {@code recurring.error.end-before-start}. */
+    public static String recurringProblemKey(InvalidRecurringTemplateException.Problem problem) {
+        return "recurring.error." + problem.name().toLowerCase(Locale.ROOT).replace('_', '-');
+    }
+
+    /** Bundle key of a Recurring Template frequency's name, e.g. {@code recurring.frequency.monthly}. */
+    public static String frequencyKey(Frequency frequency) {
+        return "recurring.frequency." + frequency.name().toLowerCase(Locale.ROOT);
     }
 
     /** Bundle key of the message for a refused Budget Limit, e.g. {@code budget-limit.error.not-positive}. */

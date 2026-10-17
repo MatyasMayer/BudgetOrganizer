@@ -25,7 +25,7 @@ class DatabaseTest {
         assertEquals(dataDir.resolve("budget.db"), database.file());
         assertTrue(Files.isRegularFile(database.file()));
         try (Connection connection = database.connect()) {
-            assertEquals(5, MigrationRunner.forApp().currentVersion(connection));
+            assertEquals(6, MigrationRunner.forApp().currentVersion(connection));
         }
     }
 
@@ -35,7 +35,7 @@ class DatabaseTest {
         Database reopened = Database.openIn(tempDir);
 
         try (Connection connection = reopened.connect()) {
-            assertEquals(5, MigrationRunner.forApp().currentVersion(connection));
+            assertEquals(6, MigrationRunner.forApp().currentVersion(connection));
         }
     }
 }

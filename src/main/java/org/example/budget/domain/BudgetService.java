@@ -28,16 +28,19 @@ public class BudgetService {
     private final SettingsRepository settings;
     private final CategoryRepository categories;
     private final TransactionRepository transactions;
+    private final RecurringTemplateRepository recurringTemplates;
     private final BudgetLimitRepository limits;
     private final Clock clock;
     private final CnbRates cnbRates;
 
     public BudgetService(SettingsRepository settings, CategoryRepository categories,
-                         TransactionRepository transactions, BudgetLimitRepository limits,
+                         TransactionRepository transactions, RecurringTemplateRepository recurringTemplates,
+                         BudgetLimitRepository limits,
                          CnbRateRepository rateCache, RateSource rateSource, Clock clock) {
         this.settings = settings;
         this.categories = categories;
         this.transactions = transactions;
+        this.recurringTemplates = recurringTemplates;
         this.limits = limits;
         this.clock = clock;
         this.cnbRates = new CnbRates(rateCache, rateSource, clock);
@@ -45,8 +48,10 @@ public class BudgetService {
 
     /** A service without ČNB Rates (every rate is unavailable), for scenarios that only use CZK. */
     public BudgetService(SettingsRepository settings, CategoryRepository categories,
-                         TransactionRepository transactions, BudgetLimitRepository limits, Clock clock) {
-        this(settings, categories, transactions, limits, CnbRates.NO_CACHE, RateSource.UNAVAILABLE, clock);
+                         TransactionRepository transactions, RecurringTemplateRepository recurringTemplates,
+                         BudgetLimitRepository limits, Clock clock) {
+        this(settings, categories, transactions, recurringTemplates, limits, CnbRates.NO_CACHE,
+                RateSource.UNAVAILABLE, clock);
     }
 
     public Month currentMonth() {
@@ -131,10 +136,16 @@ public class BudgetService {
         return !transactions.find(TransactionFilter.ALL.inCategory(categoryId)).isEmpty();
     }
 
-    /** Deletes a Category that has no Transactions. From Savings can't be deleted. */
+    /** Whether Transactions or Recurring Templates use the Category, so deleting it needs a replacement. */
+    public boolean needsReplacement(long categoryId) {
+        return hasTransactions(categoryId) || recurringTemplates.findAll().stream()
+                .anyMatch(template -> template.details().categoryId() == categoryId);
+    }
+
+    /** Deletes a Category that no Transaction or Recurring Template uses. From Savings can't be deleted. */
     public void deleteCategory(long id) {
         deletable(id);
-        if (hasTransactions(id)) {
+        if (needsReplacement(id)) {
             throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_REQUIRED);
         }
         deleteBudgetLimits(id);
@@ -142,7 +153,8 @@ public class BudgetService {
     }
 
     /**
-     * Deletes a Category and merges it into the replacement: all its Transactions move there.
+     * Deletes a Category and merges it into the replacement: all its Transactions and Recurring Templates
+     * move there.
      * The replacement must be another Category of the same type. From Savings can't be merged away.
      */
     public void deleteCategory(long id, long replacementId) {
@@ -154,6 +166,7 @@ public class BudgetService {
             throw new InvalidCategoryException(InvalidCategoryException.Problem.REPLACEMENT_OF_OTHER_TYPE);
         }
         transactions.moveToCategory(id, replacementId);
+        recurringTemplates.moveToCategory(id, replacementId);
         moveBudgetLimits(id, replacementId);
         categories.delete(id);
     }
@@ -490,6 +503,62 @@ public class BudgetService {
         }
         if (amount < 0 && details.type() == TransactionType.INCOME) {
             throw new InvalidTransactionException(Problem.NEGATIVE_INCOME);
+        }
+    }
+
+    // --- Recurring Templates ---
+
+    /** Creates a Recurring Template in CZK; its due occurrences appear on the next generation. */
+    public RecurringTemplate createRecurringTemplate(RecurringTemplateDetails details) {
+        validate(details);
+        return recurringTemplates.add(details);
+    }
+
+    /**
+     * Generates, as Transactions, every occurrence that came due after the template's last generated one (or
+     * from its start) up to today. Run on startup and when the date changes. Each template + occurrence date is
+     * generated at most once, even if its Transaction was deleted since.
+     */
+    public void generateDueOccurrences() {
+        LocalDate today = clock.today();
+        for (RecurringTemplate template : recurringTemplates.findAll()) {
+            RecurringTemplateDetails details = template.details();
+            Optional<LocalDate> last = recurringTemplates.lastOccurrence(template.id());
+            for (LocalDate date : details.occurrencesThrough(today)) {
+                if (last.isPresent() && !date.isAfter(last.get())) {
+                    continue;
+                }
+                Transaction generated = transactions.add(new TransactionDetails(
+                        date, details.type(), details.categoryId(), details.amount(), details.note()));
+                recurringTemplates.addOccurrence(template.id(), date, generated.id());
+            }
+        }
+    }
+
+    /** The ids of Transactions generated from Recurring Templates, so the Transaction list can mark them. */
+    public Set<Long> generatedTransactionIds() {
+        return recurringTemplates.generatedTransactionIds();
+    }
+
+    /** All Recurring Templates in the order they were created. */
+    public List<RecurringTemplate> recurringTemplates() {
+        return recurringTemplates.findAll();
+    }
+
+    private void validate(RecurringTemplateDetails details) {
+        Category category = categories.find(details.categoryId()).orElseThrow(
+                () -> new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.UNKNOWN_CATEGORY));
+        if (category.type() != details.type()) {
+            throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.CATEGORY_OF_OTHER_TYPE);
+        }
+        if (details.amount().halere() <= 0) {
+            throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.AMOUNT_NOT_POSITIVE);
+        }
+        if (details.dayOfMonth() < 1 || details.dayOfMonth() > 31) {
+            throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.DAY_OUT_OF_RANGE);
+        }
+        if (details.endDate().filter(end -> end.isBefore(details.startDate())).isPresent()) {
+            throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.END_BEFORE_START);
         }
     }
 }

@@ -2,12 +2,16 @@ package org.example.budget.ui;
 
 import atlantafx.base.theme.PrimerDark;
 import atlantafx.base.theme.PrimerLight;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Language;
 import org.example.budget.domain.Theme;
@@ -15,6 +19,7 @@ import org.example.budget.domain.Theme;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
@@ -29,6 +34,7 @@ public class MainWindow {
     private final Path databaseFile;
     /** The controller of the UI currently shown. */
     private MainController controller;
+    private LocalDate today;
 
     public MainWindow(Stage stage, BudgetService service, Path databaseFile) {
         this.stage = stage;
@@ -49,6 +55,7 @@ public class MainWindow {
      */
     public void show() {
         applyTheme(service.theme());
+        today = service.today();
         load(Screen.DASHBOARD);
         stage.show();
         Thread.ofVirtual().start(() -> {
@@ -57,6 +64,24 @@ public class MainWindow {
                 Platform.runLater(() -> load(controller.selected()));
             }
         });
+        watchForDayChange();
+    }
+
+    /**
+     * Checks every minute whether the date changed while the app is running; if so, generates the Recurring
+     * Templates' newly due occurrences and reloads the shown screen (the current Month may have changed too).
+     */
+    private void watchForDayChange() {
+        Timeline timer = new Timeline(new KeyFrame(Duration.minutes(1), event -> {
+            LocalDate now = service.today();
+            if (!now.equals(today)) {
+                today = now;
+                service.generateDueOccurrences();
+                load(controller.selected());
+            }
+        }));
+        timer.setCycleCount(Animation.INDEFINITE);
+        timer.play();
     }
 
     public Path databaseFile() {
@@ -83,7 +108,7 @@ public class MainWindow {
         Locale.setDefault(locale);
         ResourceBundle messages = Messages.bundle(locale);
 
-        MainController controller = new MainController(service, locale, type ->
+        controller = new MainController(service, locale, type ->
                 type == SettingsController.class ? new SettingsController(service, this) : null);
         FXMLLoader loader = new FXMLLoader(MainController.class.getResource("view/main.fxml"), messages);
         loader.setControllerFactory(type -> {

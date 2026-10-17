@@ -165,13 +165,13 @@ class ProvisionalRateScenarioTest {
                 .publish(Currency.EUR, LocalDate.of(2026, 10, 15), "24.410")
                 .publish(Currency.EUR, FRIDAY, "24.325");
         return new BudgetService(new InMemorySettingsRepository(), categories, transactions,
-                new InMemoryBudgetLimitRepository(), rateCache,
+                new InMemoryRecurringTemplateRepository(), new InMemoryBudgetLimitRepository(), rateCache,
                 onlineCnb, Clock.fixed(TUESDAY));
     }
 
     private BudgetService serviceOn(LocalDate today) {
         return new BudgetService(new InMemorySettingsRepository(), categories, transactions,
-                new InMemoryBudgetLimitRepository(), rateCache,
+                new InMemoryRecurringTemplateRepository(), new InMemoryBudgetLimitRepository(), rateCache,
                 cnb, Clock.fixed(today));
     }
 

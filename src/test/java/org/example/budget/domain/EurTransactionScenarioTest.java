@@ -207,6 +207,7 @@ class EurTransactionScenarioTest {
 
     private BudgetService serviceOn(LocalDate today) {
         return new BudgetService(new InMemorySettingsRepository(), categories, transactions,
+                new InMemoryRecurringTemplateRepository(),
                 new InMemoryBudgetLimitRepository(), rateCache, cnb, Clock.fixed(today));
     }
 
