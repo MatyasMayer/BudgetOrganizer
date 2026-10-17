@@ -19,6 +19,7 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Window;
 import javafx.util.StringConverter;
+import org.example.budget.domain.AvailableRate;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Category;
 import org.example.budget.domain.CnbRate;
@@ -33,6 +34,7 @@ import org.example.budget.domain.TransactionType;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.math.BigDecimal;
 import java.text.MessageFormat;
 import java.text.NumberFormat;
 import java.time.LocalDate;
@@ -72,6 +74,10 @@ public class TransactionEditorController {
     @FXML
     private Label cnbRate;
     @FXML
+    private Label manualRateLabel;
+    @FXML
+    private TextField manualRate;
+    @FXML
     private Label czkAmount;
     @FXML
     private TextField chargedAmount;
@@ -82,8 +88,11 @@ public class TransactionEditorController {
     @FXML
     private Label error;
 
-    /** The ČNB Rate looked up for {@link #rateDate}; empty while loading or when unavailable. */
-    private Optional<CnbRate> rate = Optional.empty();
+    /**
+     * The rate looked up for {@link #rateDate}: the ČNB Rate, or offline a cached one as a Provisional Rate;
+     * empty while loading or when there is no rate at all (the user then enters one or a Charged Amount).
+     */
+    private Optional<AvailableRate> rate = Optional.empty();
     private LocalDate rateDate;
     private boolean rateLoading;
     /** Discards the answer of a lookup that a newer one (another date or currency) has replaced. */
@@ -136,6 +145,10 @@ public class TransactionEditorController {
         currency.getItems().setAll(Currency.values());
         currency.setConverter(new CurrencyConverter());
         foreignCurrency.managedProperty().bind(foreignCurrency.visibleProperty());
+        manualRate.managedProperty().bind(manualRate.visibleProperty());
+        manualRateLabel.visibleProperty().bind(manualRate.visibleProperty());
+        manualRateLabel.managedProperty().bind(manualRate.visibleProperty());
+        manualRate.setVisible(false);
 
         existing.ifPresentOrElse(this::fill, () -> {
             date.setValue(service.today());
@@ -147,6 +160,7 @@ public class TransactionEditorController {
         date.valueProperty().addListener((obs, previous, value) -> refreshRate());
         amount.textProperty().addListener((obs, previous, value) -> showConversion());
         chargedAmount.textProperty().addListener((obs, previous, value) -> showConversion());
+        manualRate.textProperty().addListener((obs, previous, value) -> showConversion());
         refreshRate();
     }
 
@@ -158,7 +172,7 @@ public class TransactionEditorController {
             amount.setText(conversion.originalAmount().formatAmount(locale));
             chargedAmount.setText(conversion.chargedAmount().map(m -> m.formatAmount(locale)).orElse(""));
             // Keep the rate it was saved with while the date stays the same.
-            rate = Optional.of(conversion.cnbRate());
+            rate = Optional.of(new AvailableRate(conversion.cnbRate(), conversion.provisionalRate()));
             rateDate = transaction.date();
         }, () -> {
             currency.setValue(Currency.CZK);
@@ -207,9 +221,23 @@ public class TransactionEditorController {
                         Money.ofHalere(49_310).formatAmount(locale)));
             }
             OriginalAmount original = new OriginalAmount(currency.getValue(), chosenAmount.get().halere());
+            if (rateLoading) {
+                return fail(resources.getString("editor.cnb-rate.loading"));
+            }
             Optional<Conversion> conversion = rateFor(chosenDate.get())
-                    .map(r -> new Conversion(original, r, charged.get()))
-                    .or(() -> service.convert(original, chosenDate.get(), charged.get()));
+                    .map(r -> r.convert(original, charged.get()));
+            if (conversion.isEmpty() && !isBlank(manualRate.getText())) {
+                Optional<BigDecimal> entered = typedManualRate();
+                if (entered.isEmpty()) {
+                    return fail(MessageFormat.format(resources.getString("editor.error.manual-rate"),
+                            formatRate(new BigDecimal("24.325"))));
+                }
+                conversion = Optional.of(
+                        service.convertAtRate(original, chosenDate.get(), entered.get(), charged.get()));
+            }
+            if (conversion.isEmpty()) {
+                conversion = service.convert(original, chosenDate.get(), charged.get());
+            }
             if (conversion.isEmpty()) {
                 return fail(resources.getString("editor.error.rate-unavailable"));
             }
@@ -262,11 +290,34 @@ public class TransactionEditorController {
         return Money.parse(text, locale).map(Optional::of);
     }
 
-    private Optional<CnbRate> rateFor(LocalDate day) {
-        return day.equals(rateDate) ? rate.filter(r -> r.currency() == currency.getValue()) : Optional.empty();
+    private Optional<AvailableRate> rateFor(LocalDate day) {
+        return day.equals(rateDate)
+                ? rate.filter(r -> r.rate().currency() == currency.getValue())
+                : Optional.empty();
     }
 
-    /** Looks up the ČNB Rate for the chosen date off the UI thread, since it may need the network. */
+    /** The rate the user typed (CZK per unit) because none is available; empty when blank or unreadable. */
+    private Optional<BigDecimal> typedManualRate() {
+        String text = manualRate.getText();
+        if (isBlank(text)) {
+            return Optional.empty();
+        }
+        try {
+            BigDecimal value = new BigDecimal(text.strip().replace(',', '.'));
+            return value.signum() > 0 ? Optional.of(value) : Optional.empty();
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
+    private static boolean isBlank(String text) {
+        return text == null || text.isBlank();
+    }
+
+    /**
+     * Looks up the rate for the chosen date off the UI thread, since it may need the network. When ČNB can't be
+     * reached the most recent cached rate comes back as a Provisional Rate.
+     */
     private void refreshRate() {
         foreignCurrency.setVisible(isForeign());
         LocalDate day = date.getValue();
@@ -281,7 +332,7 @@ public class TransactionEditorController {
         rateDate = day;
         showConversion();
         Thread.ofVirtual().start(() -> {
-            Optional<CnbRate> found = service.cnbRate(chosen, day);
+            Optional<AvailableRate> found = service.rateToUse(chosen, day);
             Platform.runLater(() -> {
                 if (thisLookup == lookup) {
                     rateLoading = false;
@@ -297,19 +348,24 @@ public class TransactionEditorController {
             return;
         }
         LocalDate day = date.getValue();
-        Optional<CnbRate> current = day == null ? Optional.empty() : rateFor(day);
+        Optional<AvailableRate> available = day == null ? Optional.empty() : rateFor(day);
+        manualRate.setVisible(!rateLoading && available.isEmpty());
         if (rateLoading) {
             cnbRate.setText(resources.getString("editor.cnb-rate.loading"));
-        } else if (current.isEmpty()) {
-            cnbRate.setText(resources.getString("editor.cnb-rate.unavailable"));
+        } else if (available.isEmpty()) {
+            cnbRate.setText(resources.getString("editor.cnb-rate.none"));
         } else {
-            CnbRate r = current.get();
-            cnbRate.setText(MessageFormat.format(resources.getString("editor.cnb-rate.value"),
-                    r.currency().code(), formatRate(r), r.validFor().format(dateFormat())));
+            CnbRate r = available.get().rate();
+            String key = available.get().provisional() ? "editor.cnb-rate.provisional" : "editor.cnb-rate.value";
+            cnbRate.setText(MessageFormat.format(resources.getString(key),
+                    r.currency().code(), formatRate(r.czkPerUnit()), r.validFor().format(dateFormat())));
         }
 
         Optional<OriginalAmount> original = Money.parse(amount.getText(), locale)
                 .map(m -> new OriginalAmount(currency.getValue(), m.halere()));
+        Optional<CnbRate> current = available.map(AvailableRate::rate).or(() -> day == null
+                ? Optional.empty()
+                : typedManualRate().map(r -> new CnbRate(currency.getValue(), day, r)));
         Optional<Money> converted = original.flatMap(o -> current.map(r -> r.convert(o)));
         Optional<Money> charged = typedChargedAmount().flatMap(c -> c);
         if (charged.isPresent()) {
@@ -320,11 +376,11 @@ public class TransactionEditorController {
         }
     }
 
-    private String formatRate(CnbRate r) {
+    private String formatRate(BigDecimal czkPerUnit) {
         NumberFormat number = NumberFormat.getNumberInstance(locale);
         number.setMinimumFractionDigits(3);
         number.setMaximumFractionDigits(6);
-        return number.format(r.czkPerUnit());
+        return number.format(czkPerUnit);
     }
 
     private DateTimeFormatter dateFormat() {

@@ -46,12 +46,16 @@
         </columnConstraints>
         <Label text="%editor.cnb-rate" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
         <Label fx:id="cnbRate" wrapText="true" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
-        <Label text="%editor.czk-amount" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-        <Label fx:id="czkAmount" styleClass="text-bold" wrapText="true" GridPane.rowIndex="1"
+        <!-- Shown only when there is no rate at all (offline, nothing cached). -->
+        <Label fx:id="manualRateLabel" text="%editor.manual-rate" wrapText="true" GridPane.rowIndex="1"
+               GridPane.columnIndex="0"/>
+        <TextField fx:id="manualRate" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+        <Label text="%editor.czk-amount" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+        <Label fx:id="czkAmount" styleClass="text-bold" wrapText="true" GridPane.rowIndex="2"
                GridPane.columnIndex="1"/>
-        <Label text="%editor.charged-amount" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
-        <TextField fx:id="chargedAmount" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
-        <Label text="%editor.charged-amount.hint" styleClass="text-muted" wrapText="true" GridPane.rowIndex="3"
+        <Label text="%editor.charged-amount" wrapText="true" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+        <TextField fx:id="chargedAmount" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+        <Label text="%editor.charged-amount.hint" styleClass="text-muted" wrapText="true" GridPane.rowIndex="4"
                GridPane.columnIndex="1"/>
     </GridPane>
 
