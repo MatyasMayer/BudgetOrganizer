@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -422,6 +423,53 @@ public class BudgetService {
                 .comparingLong((MonthSummary.CategorySpending spending) -> spending.total().halere()).reversed()
                 .thenComparing(spending -> spending.category().name()));
         return new MonthSummary(month, income, expenses, byCategory, isDeficit(month, income.minus(expenses)));
+    }
+
+    // --- Month comparison ---
+
+    /**
+     * Compares a Month's Expenses per Category with the previous Month. For the running Month, the Same-Point
+     * Comparison covers the 1st through today in both Months, with today's day clamped to the previous Month's
+     * length; the full-Month comparison is always included. Refunds lower their Category; Incomes are left out.
+     */
+    public MonthComparison monthComparison(Month month) {
+        Month previous = month.previous();
+        Optional<Comparison> samePoint = Optional.empty();
+        if (month.equals(currentMonth())) {
+            int day = Math.min(clock.today().getDayOfMonth(), previous.days());
+            samePoint = Optional.of(compare(month.firstDay(), clock.today(),
+                    previous.firstDay(), previous.firstDay().plusDays(day - 1L)));
+        }
+        Comparison fullMonth = compare(month.firstDay(), month.lastDay(), previous.firstDay(), previous.lastDay());
+        return new MonthComparison(month, samePoint, fullMonth);
+    }
+
+    private Comparison compare(LocalDate from, LocalDate through, LocalDate previousFrom, LocalDate previousThrough) {
+        Map<Long, Money> current = expensesByCategory(from, through);
+        Map<Long, Money> before = expensesByCategory(previousFrom, previousThrough);
+        Set<Long> ids = new LinkedHashSet<>(current.keySet());
+        ids.addAll(before.keySet());
+        List<CategoryChange> changes = new ArrayList<>();
+        for (long id : ids) {
+            categories.find(id).ifPresent(category -> changes.add(new CategoryChange(category,
+                    new Change(current.getOrDefault(id, Money.ZERO), before.getOrDefault(id, Money.ZERO)))));
+        }
+        changes.sort(Comparator
+                .comparingLong((CategoryChange change) -> change.change().current().halere()).reversed()
+                .thenComparing(Comparator.comparingLong(
+                        (CategoryChange change) -> change.change().previous().halere()).reversed())
+                .thenComparing(change -> change.category().name()));
+        return new Comparison(from, through, previousFrom, previousThrough, changes);
+    }
+
+    private Map<Long, Money> expensesByCategory(LocalDate from, LocalDate through) {
+        Map<Long, Money> totals = new HashMap<>();
+        for (CategoryTotal total : transactions.categoryTotals(from, through)) {
+            if (total.type() == TransactionType.EXPENSE) {
+                totals.merge(total.categoryId(), total.total(), Money::plus);
+            }
+        }
+        return totals;
     }
 
     // --- Deficits ---
