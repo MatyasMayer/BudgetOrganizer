@@ -9,6 +9,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Facade-level scenarios for Recurring Templates in EUR: each occurrence converted at its due date's ČNB Rate. */
 class EurRecurringTemplateScenarioTest {
@@ -55,6 +57,52 @@ class EurRecurringTemplateScenarioTest {
                 spotify(LocalDate.of(2026, 9, 5), LocalDate.of(2026, 9, 4), "24.400", 26_816),
                 spotify(LocalDate.of(2026, 8, 5), LocalDate.of(2026, 8, 5), "24.500", 26_926)),
                 generated.stream().map(Transaction::details).toList());
+    }
+
+    @Test
+    void offlineAnOccurrenceUsesAProvisionalRateThatTheStartupRefreshCorrects() {
+        service.createRecurringTemplate(spotifyFrom(LocalDate.of(2026, 9, 1)));
+        service.generateDueOccurrences();
+        today.set(LocalDate.of(2026, 11, 5));
+        cnb.publish(Currency.EUR, LocalDate.of(2026, 11, 5), "24.200");
+        cnb.goOffline();
+
+        service.generateDueOccurrences();
+
+        Transaction november = service.transactions(TransactionFilter.ALL).getFirst();
+        Conversion provisional = november.details().conversion().orElseThrow();
+        assertTrue(provisional.provisionalRate());
+        // The most recent cached rate (5 Oct): 10.99 EUR × 24.325 = 267.33 CZK
+        assertEquals(LocalDate.of(2026, 10, 5), provisional.cnbRate().validFor());
+        assertEquals(Money.ofHalere(26_733), november.amount());
+
+        cnb.goOnline();
+        assertEquals(1, service.refreshProvisionalRates());
+
+        assertEquals(spotify(LocalDate.of(2026, 11, 5), LocalDate.of(2026, 11, 5), "24.200", 26_596),
+                service.transactions(TransactionFilter.ALL).getFirst().details());
+    }
+
+    @Test
+    void withNoRateAtAllTheOccurrenceWaitsForALaterGeneration() {
+        cnb.goOffline();
+        service.createRecurringTemplate(spotifyFrom(LocalDate.of(2026, 9, 1)));
+
+        service.generateDueOccurrences();
+        assertEquals(List.of(), service.transactions(TransactionFilter.ALL));
+
+        cnb.goOnline();
+        service.generateDueOccurrences();
+
+        assertEquals(List.of(LocalDate.of(2026, 10, 5), LocalDate.of(2026, 9, 5)),
+                service.transactions(TransactionFilter.ALL).stream().map(Transaction::date).toList());
+    }
+
+    @Test
+    void aEurTemplateNeedsAPositiveOriginalAmount() {
+        assertThrows(InvalidRecurringTemplateException.class, () -> service.createRecurringTemplate(
+                RecurringTemplateDetails.inForeignCurrency(TransactionType.EXPENSE, subscriptions, eur(0),
+                        "Spotify", Frequency.MONTHLY, 5, LocalDate.of(2026, 9, 1), Optional.empty())));
     }
 
     private TransactionDetails spotify(LocalDate date, LocalDate validFor, String rate, long halere) {
