@@ -4,6 +4,8 @@ import org.example.budget.domain.InvalidTransactionException.Problem;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
+import java.util.OptionalLong;
 import java.util.function.Function;
 
 /**
@@ -55,6 +57,30 @@ public class BudgetService {
     /** The Categories of one type, in the order they were created. */
     public List<Category> categories(TransactionType type) {
         return categories.findAll().stream().filter(category -> category.type() == type).toList();
+    }
+
+    /** Adds a user Category to the end of its type's list. */
+    public Category addCategory(String name, TransactionType type) {
+        return categories.add(validName(name, type, OptionalLong.empty()), type, false);
+    }
+
+    /** The stripped name, if it's not blank and no other Category of the type has it (ignoring case). */
+    private String validName(String name, TransactionType type, OptionalLong except) {
+        String stripped = name == null ? "" : name.strip();
+        if (stripped.isEmpty()) {
+            throw new InvalidCategoryException(InvalidCategoryException.Problem.BLANK_NAME);
+        }
+        boolean taken = categories(type).stream()
+                .filter(other -> except.isEmpty() || other.id() != except.getAsLong())
+                .anyMatch(other -> fold(other.name()).equals(fold(stripped)));
+        if (taken) {
+            throw new InvalidCategoryException(InvalidCategoryException.Problem.DUPLICATE_NAME);
+        }
+        return stripped;
+    }
+
+    private static String fold(String text) {
+        return text.toLowerCase(Locale.ROOT);
     }
 
     // --- Transactions ---
