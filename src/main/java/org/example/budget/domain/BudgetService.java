@@ -5,8 +5,12 @@ import org.example.budget.domain.InvalidTransactionException.Problem;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.function.Function;
 
@@ -20,13 +24,15 @@ public class BudgetService {
     private final SettingsRepository settings;
     private final CategoryRepository categories;
     private final TransactionRepository transactions;
+    private final BudgetLimitRepository limits;
     private final Clock clock;
 
     public BudgetService(SettingsRepository settings, CategoryRepository categories,
-                         TransactionRepository transactions, Clock clock) {
+                         TransactionRepository transactions, BudgetLimitRepository limits, Clock clock) {
         this.settings = settings;
         this.categories = categories;
         this.transactions = transactions;
+        this.limits = limits;
         this.clock = clock;
     }
 
@@ -207,25 +213,98 @@ public class BudgetService {
                 .reduce(Money.ZERO, Money::plus);
     }
 
+    // --- Budget Limits ---
+
+    /** Sets the Budget Limit an Expense Category has in every Month that has no Limit Override. */
+    public void setDefaultLimit(long categoryId, Money amount) {
+        validateLimit(categoryId, amount);
+        limits.save(BudgetLimit.defaultLimit(categoryId, amount));
+    }
+
+    public void clearDefaultLimit(long categoryId) {
+        limits.delete(categoryId, Optional.empty());
+    }
+
+    /** Sets the Budget Limit an Expense Category has in one Month instead of its Default Limit. */
+    public void setLimitOverride(long categoryId, Month month, Money amount) {
+        validateLimit(categoryId, amount);
+        limits.save(BudgetLimit.override(categoryId, month, amount));
+    }
+
+    /** Removes the Month's Limit Override, so the Category falls back to its Default Limit there. */
+    public void clearLimitOverride(long categoryId, Month month) {
+        limits.delete(categoryId, Optional.of(month));
+    }
+
+    public Optional<Money> defaultLimit(long categoryId) {
+        return limit(categoryId, Optional.empty());
+    }
+
+    public Optional<Money> limitOverride(long categoryId, Month month) {
+        return limit(categoryId, Optional.of(month));
+    }
+
+    /** The Month's Limit Override if there is one, otherwise the Default Limit, otherwise no limit. */
+    public Optional<Money> effectiveLimit(long categoryId, Month month) {
+        return limitOverride(categoryId, month).or(() -> defaultLimit(categoryId));
+    }
+
+    /** Each limited Category's effective limit in the Month: its Limit Override, else its Default Limit. */
+    private Map<Long, Money> effectiveLimits(Month month) {
+        Map<Long, Money> effective = new HashMap<>();
+        for (BudgetLimit limit : limits.findFor(month)) {
+            if (limit.isDefault()) {
+                effective.putIfAbsent(limit.categoryId(), limit.amount());
+            } else {
+                effective.put(limit.categoryId(), limit.amount());
+            }
+        }
+        return effective;
+    }
+
+    private void validateLimit(long categoryId, Money amount) {
+        Category category = categories.find(categoryId).orElseThrow(
+                () -> new InvalidBudgetLimitException(InvalidBudgetLimitException.Problem.UNKNOWN_CATEGORY));
+        if (category.type() != TransactionType.EXPENSE) {
+            throw new InvalidBudgetLimitException(InvalidBudgetLimitException.Problem.INCOME_CATEGORY);
+        }
+        if (amount.halere() <= 0) {
+            throw new InvalidBudgetLimitException(InvalidBudgetLimitException.Problem.NOT_POSITIVE);
+        }
+    }
+
+    private Optional<Money> limit(long categoryId, Optional<Month> month) {
+        return limits.findByCategory(categoryId).stream()
+                .filter(limit -> limit.month().equals(month))
+                .map(BudgetLimit::amount)
+                .findFirst();
+    }
+
     // --- Month dashboard ---
 
     /**
      * The Month's total Income, total Expenses, Leftover and Expenses per Category (largest first,
-     * then by name). Refunds lower their Category's total and the total Expenses.
+     * then by name). Refunds lower their Category's total and the total Expenses. Each Category carries
+     * its effective Budget Limit, and a limited Category is listed even when nothing was spent in it yet.
      */
     public MonthSummary monthSummary(Month month) {
+        Map<Long, Money> effectiveLimits = effectiveLimits(month);
         Money income = Money.ZERO;
         Money expenses = Money.ZERO;
-        List<MonthSummary.CategorySpending> byCategory = new ArrayList<>();
+        Map<Long, Money> spent = new LinkedHashMap<>();
         for (CategoryTotal total : transactions.categoryTotals(month)) {
             if (total.type() == TransactionType.INCOME) {
                 income = income.plus(total.total());
             } else {
                 expenses = expenses.plus(total.total());
-                categories.find(total.categoryId()).ifPresent(category ->
-                        byCategory.add(new MonthSummary.CategorySpending(category, total.total())));
+                spent.put(total.categoryId(), total.total());
             }
         }
+        effectiveLimits.keySet().forEach(categoryId -> spent.putIfAbsent(categoryId, Money.ZERO));
+        List<MonthSummary.CategorySpending> byCategory = new ArrayList<>();
+        spent.forEach((categoryId, total) -> categories.find(categoryId).ifPresent(category ->
+                byCategory.add(new MonthSummary.CategorySpending(
+                        category, total, Optional.ofNullable(effectiveLimits.get(categoryId))))));
         byCategory.sort(Comparator
                 .comparingLong((MonthSummary.CategorySpending spending) -> spending.total().halere()).reversed()
                 .thenComparing(spending -> spending.category().name()));
