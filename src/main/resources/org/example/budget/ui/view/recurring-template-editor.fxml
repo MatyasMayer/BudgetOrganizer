@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.DatePicker?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.layout.ColumnConstraints?>
+<?import javafx.scene.layout.GridPane?>
+<?import javafx.scene.layout.HBox?>
+
+<!-- Content of the Recurring Template editor dialog; the dialog is built by RecurringTemplateEditorController. -->
+<GridPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" hgap="12" vgap="10">
+    <padding><Insets top="8" right="8" bottom="8" left="8"/></padding>
+    <columnConstraints>
+        <ColumnConstraints minWidth="140"/>
+        <ColumnConstraints minWidth="280" maxWidth="360" hgrow="ALWAYS"/>
+    </columnConstraints>
+
+    <fx:define><ToggleGroup fx:id="typeGroup"/></fx:define>
+
+    <Label text="%editor.type" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+    <HBox spacing="16" GridPane.rowIndex="0" GridPane.columnIndex="1">
+        <RadioButton fx:id="expenseType" text="%transaction.type.expense" toggleGroup="$typeGroup"/>
+        <RadioButton fx:id="incomeType" text="%transaction.type.income" toggleGroup="$typeGroup"/>
+    </HBox>
+
+    <Label text="%recurring.editor.amount" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+    <TextField fx:id="amount" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+
+    <Label text="%editor.category" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+    <ComboBox fx:id="category" maxWidth="Infinity" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+
+    <Label text="%editor.note" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+    <TextField fx:id="note" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+
+    <Label text="%recurring.editor.frequency" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+    <ComboBox fx:id="frequency" maxWidth="Infinity" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+
+    <Label text="%recurring.editor.day" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
+    <TextField fx:id="day" GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+    <Label text="%recurring.editor.day.hint" styleClass="text-muted" wrapText="true" GridPane.rowIndex="6"
+           GridPane.columnIndex="1"/>
+
+    <Label text="%recurring.editor.start" GridPane.rowIndex="7" GridPane.columnIndex="0"/>
+    <DatePicker fx:id="startDate" maxWidth="Infinity" GridPane.rowIndex="7" GridPane.columnIndex="1"/>
+
+    <Label text="%recurring.editor.end" GridPane.rowIndex="8" GridPane.columnIndex="0"/>
+    <DatePicker fx:id="endDate" maxWidth="Infinity" GridPane.rowIndex="8" GridPane.columnIndex="1"/>
+
+    <Label fx:id="error" styleClass="danger" wrapText="true" GridPane.rowIndex="9" GridPane.columnIndex="0"
+           GridPane.columnSpan="2"/>
+</GridPane>

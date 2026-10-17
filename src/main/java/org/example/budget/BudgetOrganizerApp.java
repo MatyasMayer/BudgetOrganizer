@@ -11,6 +11,7 @@ import org.example.budget.storage.Database;
 import org.example.budget.storage.SqliteBudgetLimitRepository;
 import org.example.budget.storage.SqliteCategoryRepository;
 import org.example.budget.storage.SqliteCnbRateRepository;
+import org.example.budget.storage.SqliteRecurringTemplateRepository;
 import org.example.budget.storage.SqliteSettingsRepository;
 import org.example.budget.storage.SqliteTransactionRepository;
 import org.example.budget.ui.FirstLaunchController;
@@ -33,6 +34,7 @@ public class BudgetOrganizerApp extends Application {
                 new SqliteSettingsRepository(database),
                 new SqliteCategoryRepository(database),
                 new SqliteTransactionRepository(database),
+                new SqliteRecurringTemplateRepository(database),
                 new SqliteBudgetLimitRepository(database),
                 new SqliteCnbRateRepository(database),
                 CnbRateSource.overHttp(),
@@ -48,6 +50,7 @@ public class BudgetOrganizerApp extends Application {
             service.completeFirstLaunch(language.get(), Messages.presetCategoryNames());
         }
 
+        service.generateDueOccurrences();
         new MainWindow(stage, service, database.file()).show();
     }
 }

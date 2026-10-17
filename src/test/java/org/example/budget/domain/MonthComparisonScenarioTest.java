@@ -166,7 +166,8 @@ class MonthComparisonScenarioTest {
 
     private BudgetService serviceOn(LocalDate today) {
         BudgetService fresh = new BudgetService(new InMemorySettingsRepository(), new InMemoryCategoryRepository(),
-                new InMemoryTransactionRepository(), new InMemoryBudgetLimitRepository(), Clock.fixed(today));
+                new InMemoryTransactionRepository(), new InMemoryRecurringTemplateRepository(),
+                new InMemoryBudgetLimitRepository(), Clock.fixed(today));
         fresh.seedPresetCategories(PresetCategory::name);
         return fresh;
     }

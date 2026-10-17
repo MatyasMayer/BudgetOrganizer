@@ -247,7 +247,7 @@ public class CategoriesController {
     }
 
     private void delete(Category category) {
-        if (!service.hasTransactions(category.id())) {
+        if (!service.needsReplacement(category.id())) {
             Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
                     resources.getString("categories.delete.confirm.content"), ButtonType.OK, ButtonType.CANCEL);
             confirm.initOwner(window());

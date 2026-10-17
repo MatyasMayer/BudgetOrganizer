@@ -12,6 +12,7 @@ class BudgetServiceTest {
     private final InMemorySettingsRepository settings = new InMemorySettingsRepository();
     private final BudgetService service = new BudgetService(
             settings, new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
+            new InMemoryRecurringTemplateRepository(),
             new InMemoryBudgetLimitRepository(), Clock.fixed(LocalDate.of(2026, 10, 17)));
 
     @Test
@@ -30,6 +31,7 @@ class BudgetServiceTest {
 
         BudgetService afterRestart = new BudgetService(
                 settings, new InMemoryCategoryRepository(), new InMemoryTransactionRepository(),
+                new InMemoryRecurringTemplateRepository(),
                 new InMemoryBudgetLimitRepository(), Clock.fixed(LocalDate.of(2026, 11, 2)));
 
         assertEquals(Money.ofHalere(5_000_000), afterRestart.openingSavings());

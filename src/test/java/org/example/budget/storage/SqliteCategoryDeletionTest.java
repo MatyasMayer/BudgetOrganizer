@@ -33,7 +33,8 @@ class SqliteCategoryDeletionTest {
     void setUp() throws SQLException {
         Database database = Database.openIn(tempDir);
         service = new BudgetService(new SqliteSettingsRepository(database), new SqliteCategoryRepository(database),
-                new SqliteTransactionRepository(database), new SqliteBudgetLimitRepository(database),
+                new SqliteTransactionRepository(database), new SqliteRecurringTemplateRepository(database),
+                new SqliteBudgetLimitRepository(database),
                 Clock.fixed(TODAY));
     }
 
