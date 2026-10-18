@@ -13,14 +13,20 @@ import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.input.MouseButton;
+import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Category;
 import org.example.budget.domain.Month;
 import org.example.budget.domain.Transaction;
+import org.example.budget.domain.TransactionCsv;
 import org.example.budget.domain.TransactionFilter;
 import org.example.budget.domain.TransactionType;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.text.MessageFormat;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
@@ -46,6 +52,7 @@ public class TransactionsController {
 
     private Map<Long, Category> categoriesById = Map.of();
     private Set<Long> generatedIds = Set.of();
+    private List<Transaction> shown = List.of();
 
     @FXML
     private ResourceBundle resources;
@@ -159,6 +166,41 @@ public class TransactionsController {
         }
     }
 
+    @FXML
+    private void exportView() {
+        export(shown);
+    }
+
+    @FXML
+    private void exportAll() {
+        export(service.transactions(TransactionFilter.ALL));
+    }
+
+    /** Writes the Transactions as a CSV file the user picks: semicolon-separated, UTF-8 with a BOM. */
+    private void export(List<Transaction> transactions) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(resources.getString("transactions.export.choose"));
+        chooser.setInitialFileName("transactions.csv");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
+        File file = chooser.showSaveDialog(window());
+        if (file == null) {
+            return;
+        }
+        List<String> header = Stream.of("date", "type", "category", "amount", "original", "currency", "rate",
+                        "charged", "savings-funded", "note")
+                .map(column -> resources.getString("transactions.export.column." + column)).toList();
+        try {
+            Files.writeString(file.toPath(), TransactionCsv.render(header, transactions, this::categoryName),
+                    StandardCharsets.UTF_8);
+            new Alert(Alert.AlertType.INFORMATION, MessageFormat.format(
+                    resources.getString("transactions.export.done"), transactions.size(), file), ButtonType.OK)
+                    .showAndWait();
+        } catch (IOException e) {
+            new Alert(Alert.AlertType.ERROR, MessageFormat.format(
+                    resources.getString("transactions.export.error"), e.getMessage()), ButtonType.OK).showAndWait();
+        }
+    }
+
     private void edit(Transaction transaction) {
         if (TransactionEditorController.open(window(), service, resources, locale, Optional.of(transaction))) {
             refreshAll();
@@ -203,6 +245,7 @@ public class TransactionsController {
                 selected(typeFilter),
                 noteSearch.getText());
         List<Transaction> found = service.transactions(filter);
+        shown = found;
         generatedIds = service.generatedTransactionIds();
         table.getItems().setAll(found);
         summary.setText(MessageFormat.format(resources.getString("transactions.count"), found.size()));
