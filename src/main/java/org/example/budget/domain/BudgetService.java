@@ -533,6 +533,53 @@ public class BudgetService {
         return new YearSummary(year, months);
     }
 
+    // --- Top spending ---
+
+    /** Top spending for one Month. */
+    public TopSpending topSpending(Month month) {
+        return topSpending(List.of(month));
+    }
+
+    /** Top spending for a whole year. */
+    public TopSpending topSpending(int year) {
+        return topSpending(java.util.stream.IntStream.rangeClosed(1, 12).mapToObj(value -> Month.of(year, value)).toList());
+    }
+
+    /**
+     * Ranks the Expense Categories by total, largest first (then by name), leaving out those whose Refunds
+     * cancel their spending, and lists the five biggest single Expenses, largest first (then newest). Refunds
+     * are never a biggest Expense. Savings-Funded Expenses count and are marked.
+     */
+    private TopSpending topSpending(List<Month> months) {
+        Map<Long, Money> totals = new HashMap<>();
+        Map<Long, Money> fromSavings = new HashMap<>();
+        List<Transaction> expenses = new ArrayList<>();
+        for (Month month : months) {
+            for (Transaction transaction : transactions.find(TransactionFilter.ALL.inMonth(month).ofType(TransactionType.EXPENSE))) {
+                totals.merge(transaction.categoryId(), transaction.amount(), Money::plus);
+                if (transaction.details().savingsFunded()) {
+                    fromSavings.merge(transaction.categoryId(), transaction.amount(), Money::plus);
+                }
+                if (!transaction.isRefund()) {
+                    expenses.add(transaction);
+                }
+            }
+        }
+        List<CategoryRank> ranked = new ArrayList<>();
+        totals.forEach((categoryId, total) -> {
+            if (total.halere() > 0) {
+                categories.find(categoryId).ifPresent(category -> ranked.add(
+                        new CategoryRank(category, total, fromSavings.getOrDefault(categoryId, Money.ZERO))));
+            }
+        });
+        ranked.sort(Comparator.comparingLong((CategoryRank rank) -> rank.total().halere()).reversed()
+                .thenComparing(rank -> rank.category().name()));
+        expenses.sort(Comparator.comparingLong((Transaction transaction) -> transaction.amount().halere()).reversed()
+                .thenComparing(Transaction::date, Comparator.reverseOrder())
+                .thenComparingLong(Transaction::id));
+        return new TopSpending(ranked, expenses.stream().limit(5).toList());
+    }
+
     // --- Pace ---
 
     /**
