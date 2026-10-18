@@ -29,7 +29,8 @@ import java.util.Optional;
 public class SqliteTransactionRepository implements TransactionRepository {
 
     private static final String COLUMNS = "SELECT id, date, type, category_id, amount, note, original_currency,"
-            + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount, provisional_rate FROM transactions";
+            + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount, provisional_rate,"
+            + " savings_funded FROM transactions";
 
     private final Database database;
 
@@ -42,8 +43,8 @@ public class SqliteTransactionRepository implements TransactionRepository {
         try (Connection connection = database.connect();
              PreparedStatement insert = connection.prepareStatement(
                      "INSERT INTO transactions (date, type, category_id, amount, note, original_currency,"
-                             + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount, provisional_rate)"
-                             + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                             + " original_amount, cnb_rate, cnb_rate_valid_for, charged_amount, provisional_rate,"
+                             + " savings_funded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                      Statement.RETURN_GENERATED_KEYS)) {
             bind(insert, details);
             insert.executeUpdate();
@@ -75,9 +76,9 @@ public class SqliteTransactionRepository implements TransactionRepository {
              PreparedStatement update = connection.prepareStatement(
                      "UPDATE transactions SET date = ?, type = ?, category_id = ?, amount = ?, note = ?,"
                              + " original_currency = ?, original_amount = ?, cnb_rate = ?, cnb_rate_valid_for = ?,"
-                             + " charged_amount = ?, provisional_rate = ? WHERE id = ?")) {
+                             + " charged_amount = ?, provisional_rate = ?, savings_funded = ? WHERE id = ?")) {
             bind(update, transaction.details());
-            update.setLong(12, transaction.id());
+            update.setLong(13, transaction.id());
             update.executeUpdate();
         } catch (SQLException e) {
             throw new StorageException("Cannot update Transaction " + transaction.id(), e);
@@ -158,12 +159,36 @@ public class SqliteTransactionRepository implements TransactionRepository {
 
     @Override
     public List<CategoryTotal> categoryTotals(LocalDate from, LocalDate through) {
+        return categoryTotals(from, through, false);
+    }
+
+    @Override
+    public List<CategoryTotal> savingsFundedTotals(Month month) {
+        return categoryTotals(month.firstDay(), month.lastDay(), true);
+    }
+
+    @Override
+    public Money savingsFundedTotal() {
+        try (Connection connection = database.connect();
+             PreparedStatement query = connection.prepareStatement(
+                     "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE savings_funded = 1");
+             ResultSet result = query.executeQuery()) {
+            result.next();
+            return Money.ofHalere(result.getLong(1));
+        } catch (SQLException e) {
+            throw new StorageException("Cannot total the Savings-Funded Expenses", e);
+        }
+    }
+
+    /** Totals of either the Savings-Funded Expenses only or of every other Transaction. */
+    private List<CategoryTotal> categoryTotals(LocalDate from, LocalDate through, boolean savingsFunded) {
         try (Connection connection = database.connect();
              PreparedStatement query = connection.prepareStatement(
                      "SELECT category_id, type, SUM(amount) AS total FROM transactions"
-                             + " WHERE date BETWEEN ? AND ? GROUP BY category_id, type")) {
+                             + " WHERE date BETWEEN ? AND ? AND savings_funded = ? GROUP BY category_id, type")) {
             query.setString(1, from.toString());
             query.setString(2, through.toString());
+            query.setInt(3, savingsFunded ? 1 : 0);
             List<CategoryTotal> totals = new ArrayList<>();
             try (ResultSet result = query.executeQuery()) {
                 while (result.next()) {
@@ -185,7 +210,7 @@ public class SqliteTransactionRepository implements TransactionRepository {
                      "SELECT substr(date, 1, 7) AS month,"
                              + " SUM(CASE WHEN type = 'INCOME' THEN amount ELSE 0 END) AS income,"
                              + " SUM(CASE WHEN type = 'EXPENSE' THEN amount ELSE 0 END) AS expenses"
-                             + " FROM transactions GROUP BY month ORDER BY month");
+                             + " FROM transactions WHERE savings_funded = 0 GROUP BY month ORDER BY month");
              ResultSet result = query.executeQuery()) {
             List<MonthTotals> totals = new ArrayList<>();
             while (result.next()) {
@@ -211,6 +236,7 @@ public class SqliteTransactionRepository implements TransactionRepository {
         statement.setString(9, conversion.map(c -> c.cnbRate().validFor().toString()).orElse(null));
         statement.setObject(10, conversion.flatMap(Conversion::chargedAmount).map(Money::halere).orElse(null));
         statement.setInt(11, conversion.filter(Conversion::provisionalRate).isPresent() ? 1 : 0);
+        statement.setInt(12, details.savingsFunded() ? 1 : 0);
     }
 
     private static Transaction read(ResultSet row) throws SQLException {
@@ -220,7 +246,8 @@ public class SqliteTransactionRepository implements TransactionRepository {
                 row.getLong("category_id"),
                 Money.ofHalere(row.getLong("amount")),
                 row.getString("note"),
-                readConversion(row)));
+                readConversion(row),
+                row.getInt("savings_funded") == 1));
     }
 
     private static Optional<Conversion> readConversion(ResultSet row) throws SQLException {

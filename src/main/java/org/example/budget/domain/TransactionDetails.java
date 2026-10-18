@@ -9,9 +9,12 @@ import java.util.Optional;
  * A negative Expense amount is a Refund. A blank Note is stored as no Note ({@code ""}).
  * A foreign-currency Transaction also has a {@link Conversion}; its CZK amount is then always the
  * conversion's ({@link Conversion#czkAmount()}).
+ * <p>
+ * {@code savingsFunded} marks a Savings-Funded Expense: paid from Savings, so it doesn't count toward its
+ * Month's Leftover or its Category's Budget Limit. Only an Expense can be Savings-Funded.
  */
 public record TransactionDetails(LocalDate date, TransactionType type, long categoryId, Money amount, String note,
-                                 Optional<Conversion> conversion) {
+                                 Optional<Conversion> conversion, boolean savingsFunded) {
 
     public TransactionDetails {
         Objects.requireNonNull(date);
@@ -26,6 +29,12 @@ public record TransactionDetails(LocalDate date, TransactionType type, long cate
         });
     }
 
+    /** A Transaction that isn't Savings-Funded. */
+    public TransactionDetails(LocalDate date, TransactionType type, long categoryId, Money amount, String note,
+                              Optional<Conversion> conversion) {
+        this(date, type, categoryId, amount, note, conversion, false);
+    }
+
     /** A Transaction entered in CZK. */
     public TransactionDetails(LocalDate date, TransactionType type, long categoryId, Money amount, String note) {
         this(date, type, categoryId, amount, note, Optional.empty());
@@ -35,6 +44,11 @@ public record TransactionDetails(LocalDate date, TransactionType type, long cate
     public static TransactionDetails converted(LocalDate date, TransactionType type, long categoryId,
                                                Conversion conversion, String note) {
         return new TransactionDetails(date, type, categoryId, conversion.czkAmount(), note, Optional.of(conversion));
+    }
+
+    /** The same Transaction, marked as a Savings-Funded Expense or not. */
+    public TransactionDetails withSavingsFunded(boolean savingsFunded) {
+        return new TransactionDetails(date, type, categoryId, amount, note, conversion, savingsFunded);
     }
 
     public boolean hasNote() {

@@ -1,16 +1,21 @@
 package org.example.budget.ui;
 
 import javafx.fxml.FXML;
+import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Language;
+import org.example.budget.domain.Money;
 import org.example.budget.domain.Theme;
 
+import java.text.MessageFormat;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.ResourceBundle;
 
-/** The Settings screen: UI language, theme, and where {@code budget.db} is stored. */
+/** The Settings screen: UI language, theme, Opening Savings, and where {@code budget.db} is stored. */
 public class SettingsController {
 
     private final BudgetService service;
@@ -32,6 +37,10 @@ public class SettingsController {
     private RadioButton dark;
     @FXML
     private TextField databaseFile;
+    @FXML
+    private TextField openingSavings;
+    @FXML
+    private Label openingSavingsStatus;
 
     public SettingsController(BudgetService service, MainWindow window) {
         this.service = service;
@@ -53,6 +62,7 @@ public class SettingsController {
         (service.theme() == Theme.DARK ? dark : light).setSelected(true);
 
         databaseFile.setText(window.databaseFile().toAbsolutePath().toString());
+        openingSavings.setText(service.openingSavings().formatAmount(locale()));
 
         // Listeners go last so selecting the saved values above doesn't count as a change.
         languageGroup.selectedToggleProperty().addListener((obs, previous, selected) -> {
@@ -65,5 +75,24 @@ public class SettingsController {
                 window.changeTheme((Theme) selected.getUserData());
             }
         });
+    }
+
+    @FXML
+    private void saveOpeningSavings() {
+        Optional<Money> amount = Money.parse(openingSavings.getText(), locale()).filter(money -> money.halere() >= 0);
+        if (amount.isEmpty()) {
+            openingSavingsStatus.getStyleClass().setAll("label", "danger");
+            openingSavingsStatus.setText(MessageFormat.format(resources.getString("settings.opening-savings.error"),
+                    Money.ofHalere(5_000_000).formatAmount(locale())));
+            return;
+        }
+        service.setOpeningSavings(amount.get());
+        openingSavings.setText(amount.get().formatAmount(locale()));
+        openingSavingsStatus.getStyleClass().setAll("label", "success");
+        openingSavingsStatus.setText(resources.getString("settings.opening-savings.saved"));
+    }
+
+    private Locale locale() {
+        return service.language().locale();
     }
 }

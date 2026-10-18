@@ -24,13 +24,32 @@ public record MonthSummary(Month month, Money income, Money expenses, List<Categ
         return income.minus(expenses);
     }
 
-    /** One Expense Category's net spending in the Month, and its effective Budget Limit if it has one. */
-    public record CategorySpending(Category category, Money total, Optional<Money> limit) {
+    /**
+     * One Expense Category's net spending in the Month, and its effective Budget Limit if it has one.
+     * {@code total} counts toward the Leftover and the Budget Limit; {@code fromSavings} is what the Category's
+     * Savings-Funded Expenses took from Savings, shown in its slice with a "from Savings" marker.
+     */
+    public record CategorySpending(Category category, Money total, Optional<Money> limit, Money fromSavings) {
 
         public CategorySpending {
             Objects.requireNonNull(category);
             Objects.requireNonNull(total);
             Objects.requireNonNull(limit);
+            Objects.requireNonNull(fromSavings);
+        }
+
+        /** Spending without Savings-Funded Expenses. */
+        public CategorySpending(Category category, Money total, Optional<Money> limit) {
+            this(category, total, limit, Money.ZERO);
+        }
+
+        /** Everything spent in the Category, Savings-Funded Expenses included: the size of its pie slice. */
+        public Money spent() {
+            return total.plus(fromSavings);
+        }
+
+        public boolean hasFromSavings() {
+            return fromSavings.halere() != 0;
         }
 
         /** Spending of a Category without a Budget Limit. */
