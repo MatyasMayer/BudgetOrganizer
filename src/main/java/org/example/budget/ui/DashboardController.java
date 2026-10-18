@@ -68,6 +68,8 @@ public class DashboardController {
     @FXML
     private Label savingsTotal;
     @FXML
+    private Label savingsRate;
+    @FXML
     private Label deficitBadge;
     @FXML
     private VBox paceBox;
@@ -110,6 +112,7 @@ public class DashboardController {
         deficitBadge.managedProperty().bind(deficitBadge.visibleProperty());
         uncoveredDeficits.managedProperty().bind(uncoveredDeficits.visibleProperty());
         paceBox.managedProperty().bind(paceBox.visibleProperty());
+        savingsRate.managedProperty().bind(savingsRate.visibleProperty());
         monthPicker.valueProperty().addListener((obs, previous, date) -> {
             if (date != null && !month.contains(date)) {
                 show(Month.of(date));
@@ -161,6 +164,10 @@ public class DashboardController {
             leftoverTotal.getStyleClass().add("danger");
         }
         deficitBadge.setVisible(summary.deficit());
+        Optional<BigDecimal> rate = service.savingsRate(month);
+        savingsRate.setVisible(rate.isPresent());
+        rate.ifPresent(value -> savingsRate.setText(MessageFormat.format(
+                resources.getString("dashboard.savings-rate"), rateFormat().format(value))));
         Money savings = service.savings();
         savingsTotal.setText(savings.format(locale));
         savingsTotal.getStyleClass().remove("danger");
@@ -301,6 +308,12 @@ public class DashboardController {
         Tooltip.install(bar, new Tooltip(MessageFormat.format(resources.getString("dashboard.limit.tooltip"),
                 item.total().format(locale), limit.format(locale))));
         return bar;
+    }
+
+    private NumberFormat rateFormat() {
+        NumberFormat format = NumberFormat.getPercentInstance(locale);
+        format.setMaximumFractionDigits(1);
+        return format;
     }
 
     private String percent(Money part, Money whole) {

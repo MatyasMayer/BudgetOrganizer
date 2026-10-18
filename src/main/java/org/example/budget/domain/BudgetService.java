@@ -475,6 +475,64 @@ public class BudgetService {
         return new MonthSummary(month, income, expenses, byCategory, isDeficit(month, income.minus(expenses)));
     }
 
+    // --- Savings Rate and year summary ---
+
+    /**
+     * The share of the Month's Income, From Savings excluded, that became Leftover (e.g. 0.6000 for 60 %), or
+     * empty when that Income is 0, since then there is nothing to divide by. Negative when more was spent
+     * than earned.
+     */
+    public Optional<BigDecimal> savingsRate(Month month) {
+        Money income = Money.ZERO;
+        Money expenses = Money.ZERO;
+        for (CategoryTotal total : transactions.categoryTotals(month)) {
+            if (total.type() == TransactionType.INCOME) {
+                income = income.plus(total.total());
+            } else {
+                expenses = expenses.plus(total.total());
+            }
+        }
+        return savingsRate(income, expenses, fromSavingsIncome(month));
+    }
+
+    private static Optional<BigDecimal> savingsRate(Money income, Money expenses, Money fromSavingsIncome) {
+        Money earned = income.minus(fromSavingsIncome);
+        if (earned.halere() == 0) {
+            return Optional.empty();
+        }
+        return Optional.of(BigDecimal.valueOf(income.minus(expenses).halere())
+                .divide(BigDecimal.valueOf(earned.halere()), 4, RoundingMode.HALF_UP));
+    }
+
+    private Money fromSavingsIncome(Month month) {
+        Set<Long> systemCategories = categories(TransactionType.INCOME).stream()
+                .filter(Category::system).map(Category::id).collect(java.util.stream.Collectors.toSet());
+        return transactions.categoryTotals(month).stream()
+                .filter(total -> systemCategories.contains(total.categoryId()))
+                .map(CategoryTotal::total)
+                .reduce(Money.ZERO, Money::plus);
+    }
+
+    /**
+     * A year's 12 Months with Income, Expenses, Leftover, Savings Rate and Deficit marker, plus the year totals.
+     * Savings-Funded Expenses are listed per Month but count toward neither Expenses nor Leftover.
+     */
+    public YearSummary yearSummary(int year) {
+        Map<Month, MonthTotals> totalsByMonth = new HashMap<>();
+        transactions.monthTotals().forEach(totals -> totalsByMonth.put(totals.month(), totals));
+        List<MonthOfYear> months = new ArrayList<>();
+        for (int value = 1; value <= 12; value++) {
+            Month month = Month.of(year, value);
+            MonthTotals totals = totalsByMonth.getOrDefault(month, new MonthTotals(month, Money.ZERO, Money.ZERO));
+            Money fromSavings = transactions.savingsFundedTotals(month).stream()
+                    .map(CategoryTotal::total).reduce(Money.ZERO, Money::plus);
+            months.add(new MonthOfYear(month, totals.income(), totals.expenses(), fromSavings,
+                    isDeficit(month, totals.leftover()),
+                    savingsRate(totals.income(), totals.expenses(), fromSavingsIncome(month))));
+        }
+        return new YearSummary(year, months);
+    }
+
     // --- Pace ---
 
     /**
