@@ -475,6 +475,110 @@ public class BudgetService {
         return new MonthSummary(month, income, expenses, byCategory, isDeficit(month, income.minus(expenses)));
     }
 
+    // --- Pace ---
+
+    /**
+     * Pace, daily average and safe-to-spend for the running Month, as of today. Only Variable Spending (all
+     * Expenses except Recurring Template occurrences) is extrapolated; Fixed Spending (generated occurrences
+     * plus those of active Expense templates still due later in the Month) is added as a known amount.
+     * Savings-Funded Expenses are left out. Pace is shown per limited Category and overall; only a limited
+     * Category has a limit to warn against. The remaining days include today, so the last day still has one.
+     */
+    public MonthPace monthPace() {
+        LocalDate today = clock.today();
+        Month month = Month.of(today);
+        int elapsed = today.getDayOfMonth();
+        int remaining = month.days() - elapsed + 1;
+
+        Map<Long, Money> fixed = fixedSpending(month, today);
+        Map<Long, Money> variable = new HashMap<>();
+        Money income = Money.ZERO;
+        for (CategoryTotal total : transactions.categoryTotals(month)) {
+            if (total.type() == TransactionType.INCOME) {
+                income = income.plus(total.total());
+            } else {
+                variable.put(total.categoryId(), total.total());
+            }
+        }
+        Set<Long> generated = recurringTemplates.generatedTransactionIds();
+        for (Transaction transaction : transactions.find(TransactionFilter.ALL.inMonth(month))) {
+            if (transaction.type() == TransactionType.EXPENSE && !transaction.details().savingsFunded()
+                    && generated.contains(transaction.id())) {
+                variable.merge(transaction.categoryId(), transaction.amount().negate(), Money::plus);
+            }
+        }
+        Money fixedTotal = sum(fixed.values());
+        Money variableTotal = sum(variable.values());
+
+        List<CategoryPace> byCategory = new ArrayList<>();
+        for (MonthSummary.CategorySpending spending : monthSummary(month).expensesByCategory()) {
+            long id = spending.category().id();
+            spending.limit().ifPresent(limit -> {
+                Money categoryFixed = fixed.getOrDefault(id, Money.ZERO);
+                Money categoryVariable = variable.getOrDefault(id, Money.ZERO);
+                byCategory.add(new CategoryPace(spending.category(),
+                        extrapolate(categoryVariable, elapsed, month.days()).plus(categoryFixed), limit,
+                        perDay(limit.minus(categoryFixed).minus(categoryVariable), remaining)));
+            });
+        }
+        return new MonthPace(month, extrapolate(variableTotal, elapsed, month.days()).plus(fixedTotal),
+                perDay(variableTotal, elapsed, RoundingMode.HALF_UP),
+                perDay(income.minus(fixedTotal).minus(variableTotal), remaining), byCategory);
+    }
+
+    /** Each Category's Fixed Spending in the Month: generated occurrences plus those still due after today. */
+    private Map<Long, Money> fixedSpending(Month month, LocalDate today) {
+        Map<Long, Money> fixed = new HashMap<>();
+        Set<Long> generated = recurringTemplates.generatedTransactionIds();
+        for (Transaction transaction : transactions.find(TransactionFilter.ALL.inMonth(month))) {
+            if (transaction.type() == TransactionType.EXPENSE && !transaction.details().savingsFunded()
+                    && generated.contains(transaction.id())) {
+                fixed.merge(transaction.categoryId(), transaction.amount(), Money::plus);
+            }
+        }
+        for (RecurringTemplate template : recurringTemplates.findAll()) {
+            RecurringTemplateDetails details = template.details();
+            if (details.type() != TransactionType.EXPENSE
+                    || firstOpenMonth(template.id()).isAfter(YearMonth.from(month.firstDay()))) {
+                continue;
+            }
+            for (LocalDate date : details.occurrencesThrough(month.lastDay())) {
+                if (date.isAfter(today) && month.contains(date)) {
+                    occurrenceCost(details, today).ifPresent(cost ->
+                            fixed.merge(details.categoryId(), cost, Money::plus));
+                }
+            }
+        }
+        return fixed;
+    }
+
+    /** What one occurrence costs in CZK; a foreign-currency one at the latest known rate, none without a rate. */
+    private Optional<Money> occurrenceCost(RecurringTemplateDetails details, LocalDate today) {
+        return details.originalAmount()
+                .map(amount -> rateToUse(amount.currency(), today).map(rate -> rate.rate().convert(amount)))
+                .orElse(Optional.of(details.amount()));
+    }
+
+    private static Money sum(java.util.Collection<Money> amounts) {
+        return amounts.stream().reduce(Money.ZERO, Money::plus);
+    }
+
+    /** Variable Spending so far ÷ days elapsed × days in the Month, to the haléř. */
+    private static Money extrapolate(Money variable, int elapsed, int days) {
+        return Money.ofHalere(BigDecimal.valueOf(variable.halere()).multiply(BigDecimal.valueOf(days))
+                .divide(BigDecimal.valueOf(elapsed), 0, RoundingMode.HALF_UP).longValueExact());
+    }
+
+    /** Safe-to-spend: what is left, spread over the remaining days, rounded down and never below zero. */
+    private static Money perDay(Money left, int days) {
+        return left.halere() <= 0 ? Money.ZERO : perDay(left, days, RoundingMode.DOWN);
+    }
+
+    private static Money perDay(Money amount, int days, RoundingMode rounding) {
+        return Money.ofHalere(BigDecimal.valueOf(amount.halere())
+                .divide(BigDecimal.valueOf(days), 0, rounding).longValueExact());
+    }
+
     // --- Month comparison ---
 
     /**
