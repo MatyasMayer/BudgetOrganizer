@@ -64,6 +64,12 @@
         </VBox>
     </HBox>
 
+    <VBox fx:id="paceBox" styleClass="dashboard-tile" spacing="4" visible="false">
+        <Label text="%dashboard.pace.title" styleClass="title-4"/>
+        <FlowPane fx:id="paceFigures" hgap="24" vgap="4"/>
+        <VBox fx:id="paceCategories" spacing="2"/>
+    </VBox>
+
     <HBox fx:id="uncoveredDeficits" styleClass="deficit-list" spacing="8" alignment="CENTER_LEFT"
           visible="false">
         <Label text="%dashboard.uncovered-deficits" styleClass="danger"/>

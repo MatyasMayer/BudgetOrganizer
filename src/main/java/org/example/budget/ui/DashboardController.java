@@ -12,11 +12,14 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
 import org.example.budget.domain.BudgetService;
+import org.example.budget.domain.CategoryPace;
 import org.example.budget.domain.Deficit;
 import org.example.budget.domain.Money;
 import org.example.budget.domain.Month;
+import org.example.budget.domain.MonthPace;
 import org.example.budget.domain.MonthSummary;
 import org.example.budget.domain.MonthSummary.CategorySpending;
 
@@ -67,6 +70,12 @@ public class DashboardController {
     @FXML
     private Label deficitBadge;
     @FXML
+    private VBox paceBox;
+    @FXML
+    private FlowPane paceFigures;
+    @FXML
+    private VBox paceCategories;
+    @FXML
     private HBox uncoveredDeficits;
     @FXML
     private FlowPane deficitLinks;
@@ -100,6 +109,7 @@ public class DashboardController {
         monthPicker.setEditable(false);
         deficitBadge.managedProperty().bind(deficitBadge.visibleProperty());
         uncoveredDeficits.managedProperty().bind(uncoveredDeficits.visibleProperty());
+        paceBox.managedProperty().bind(paceBox.visibleProperty());
         monthPicker.valueProperty().addListener((obs, previous, date) -> {
             if (date != null && !month.contains(date)) {
                 show(Month.of(date));
@@ -158,6 +168,7 @@ public class DashboardController {
             savingsTotal.getStyleClass().add("danger");
         }
         fillDeficits(service.uncoveredDeficits());
+        fillPace();
 
         List<Slice> slices = slices(summary.expensesByCategory());
         Money pieTotal = slices.stream().map(Slice::total).reduce(Money.ZERO, Money::plus);
@@ -173,6 +184,38 @@ public class DashboardController {
         pie.setVisible(!empty);
         noExpenses.setVisible(empty);
         fillTable(summary.expensesByCategory());
+    }
+
+    /** Pace, daily average and safe-to-spend, only for the running Month. */
+    private void fillPace() {
+        boolean running = month.equals(service.currentMonth());
+        paceBox.setVisible(running);
+        paceFigures.getChildren().clear();
+        paceCategories.getChildren().clear();
+        if (!running) {
+            return;
+        }
+        MonthPace pace = service.monthPace();
+        paceFigures.getChildren().addAll(
+                figure("dashboard.pace", pace.pace()),
+                figure("dashboard.daily-average", pace.dailyAverage()),
+                figure("dashboard.safe-to-spend", pace.safeToSpendPerDay()));
+        for (CategoryPace category : pace.categories()) {
+            Label line = new Label(MessageFormat.format(resources.getString("dashboard.pace.category"),
+                    category.category().name(), category.pace().format(locale), category.limit().format(locale),
+                    category.safeToSpendPerDay().format(locale)));
+            if (category.exceedsLimit()) {
+                line.setText(MessageFormat.format(resources.getString("dashboard.pace.warning"), line.getText()));
+                line.getStyleClass().add("danger");
+            }
+            paceCategories.getChildren().add(line);
+        }
+    }
+
+    private Label figure(String labelKey, Money amount) {
+        Label figure = new Label(MessageFormat.format(resources.getString(labelKey), amount.format(locale)));
+        figure.setTooltip(new Tooltip(resources.getString(labelKey + ".hint")));
+        return figure;
     }
 
     /** Every Month with an Uncovered Deficit as a link that opens it; hidden when there are none. */
