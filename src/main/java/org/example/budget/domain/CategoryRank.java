@@ -4,17 +4,17 @@ import java.util.Objects;
 
 /**
  * An Expense Category's net total over a period (Refunds subtracted, Savings-Funded Expenses included), of which
- * {@code fromSavings} was paid from Savings.
+ * {@code savingsFunded} was paid from Savings.
  */
-public record CategoryRank(Category category, Money total, Money fromSavings) {
+public record CategoryRank(Category category, Money total, Money savingsFunded) {
 
     public CategoryRank {
         Objects.requireNonNull(category);
         Objects.requireNonNull(total);
-        Objects.requireNonNull(fromSavings);
+        Objects.requireNonNull(savingsFunded);
     }
 
-    public boolean hasFromSavings() {
-        return fromSavings.halere() != 0;
+    public boolean hasSavingsFunded() {
+        return savingsFunded.halere() != 0;
     }
 }

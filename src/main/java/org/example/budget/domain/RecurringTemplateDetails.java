@@ -66,6 +66,12 @@ public record RecurringTemplateDetails(
                 endDate, originalAmount);
     }
 
+    /** The same template ending on this date. */
+    public RecurringTemplateDetails endingOn(LocalDate endDate) {
+        return new RecurringTemplateDetails(type, categoryId, amount, note, frequency, dayOfMonth, startDate,
+                Optional.of(endDate), originalAmount);
+    }
+
     public boolean hasNote() {
         return !note.isEmpty();
     }

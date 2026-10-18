@@ -129,10 +129,10 @@ class YearAndSavingsRateScenarioTest {
 
         MonthOfYear april = service.yearSummary(2026).months().get(3);
 
-        assertEquals(czk(25_000), april.fromSavings());
+        assertEquals(czk(25_000), april.savingsFunded());
         assertEquals(czk(20_000), april.expenses());
         assertEquals(czk(10_000), april.leftover());
-        assertTrue(service.yearSummary(2026).months().get(0).fromSavings().equals(Money.ZERO));
+        assertTrue(service.yearSummary(2026).months().get(0).savingsFunded().equals(Money.ZERO));
     }
 
     @Test
