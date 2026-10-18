@@ -1,12 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.ToggleButton?>
+<?import javafx.scene.control.ToggleGroup?>
+<?import javafx.scene.control.Tooltip?>
+<?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<!-- Placeholder View; filled in by a later ticket. -->
-<VBox xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" spacing="8">
-    <padding><Insets top="24" right="24" bottom="24" left="24"/></padding>
-    <Label text="%screen.top-spending" styleClass="title-2"/>
-    <Label text="%screen.placeholder" styleClass="text-muted"/>
-</VBox>
+<ScrollPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="org.example.budget.ui.TopSpendingController" fitToWidth="true"
+            styleClass="edge-to-edge">
+    <VBox spacing="16">
+        <padding><Insets top="24" right="24" bottom="24" left="24"/></padding>
+
+        <Label text="%screen.top-spending" styleClass="title-2"/>
+
+        <HBox spacing="8" alignment="CENTER_LEFT">
+            <fx:define><ToggleGroup fx:id="scope"/></fx:define>
+            <ToggleButton fx:id="monthScope" text="%top-spending.scope.month" toggleGroup="$scope"/>
+            <ToggleButton fx:id="yearScope" text="%top-spending.scope.year" toggleGroup="$scope"/>
+            <Button text="‹" onAction="#previous" accessibleText="%top-spending.previous">
+                <tooltip><Tooltip text="%top-spending.previous"/></tooltip>
+            </Button>
+            <Label fx:id="periodTitle" styleClass="title-3" minWidth="180" alignment="CENTER"/>
+            <Button text="›" onAction="#next" accessibleText="%top-spending.next">
+                <tooltip><Tooltip text="%top-spending.next"/></tooltip>
+            </Button>
+            <Button text="%top-spending.current" onAction="#current"/>
+        </HBox>
+
+        <VBox fx:id="sections" spacing="12"/>
+    </VBox>
+</ScrollPane>
