@@ -18,6 +18,7 @@ import org.example.budget.ui.MainWindow;
 import org.example.budget.ui.Messages;
 
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 /** The application bootstrap: wires the real implementations together and opens the main window. */
 public class BudgetOrganizerApp extends Application {
@@ -51,6 +52,7 @@ public class BudgetOrganizerApp extends Application {
         }
 
         service.generateDueOccurrences();
-        new MainWindow(stage, service, database.file()).show();
+        new MainWindow(stage, service, database.file(),
+                folder -> database.backupTo(folder, LocalDateTime.now())).show();
     }
 }

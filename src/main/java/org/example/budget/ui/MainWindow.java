@@ -32,14 +32,16 @@ public class MainWindow {
     private final Stage stage;
     private final BudgetService service;
     private final Path databaseFile;
+    private final DatabaseBackup backup;
     /** The controller of the UI currently shown. */
     private MainController controller;
     private LocalDate today;
 
-    public MainWindow(Stage stage, BudgetService service, Path databaseFile) {
+    public MainWindow(Stage stage, BudgetService service, Path databaseFile, DatabaseBackup backup) {
         this.stage = stage;
         this.service = service;
         this.databaseFile = databaseFile;
+        this.backup = backup;
     }
 
     /** Applies the saved theme (also for the first-launch dialog, before the window opens). */
@@ -86,6 +88,10 @@ public class MainWindow {
 
     public Path databaseFile() {
         return databaseFile;
+    }
+
+    public DatabaseBackup backup() {
+        return backup;
     }
 
     public void changeLanguage(Language language) {

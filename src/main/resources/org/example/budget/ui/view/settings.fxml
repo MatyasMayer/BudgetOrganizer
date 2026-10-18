@@ -49,5 +49,10 @@
     <VBox spacing="8">
         <Label text="%settings.database" styleClass="title-4"/>
         <TextField fx:id="databaseFile" editable="false"/>
+        <HBox spacing="8" alignment="CENTER_LEFT">
+            <Button text="%settings.backup" onAction="#backupDatabase"/>
+        </HBox>
+        <Label text="%settings.backup.hint" styleClass="text-muted" wrapText="true"/>
+        <Label fx:id="backupStatus" wrapText="true"/>
     </VBox>
 </VBox>

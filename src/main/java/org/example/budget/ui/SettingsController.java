@@ -5,11 +5,14 @@ import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleGroup;
+import javafx.stage.DirectoryChooser;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Language;
 import org.example.budget.domain.Money;
 import org.example.budget.domain.Theme;
 
+import java.io.File;
+import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.Optional;
@@ -41,6 +44,8 @@ public class SettingsController {
     private TextField openingSavings;
     @FXML
     private Label openingSavingsStatus;
+    @FXML
+    private Label backupStatus;
 
     public SettingsController(BudgetService service, MainWindow window) {
         this.service = service;
@@ -90,6 +95,24 @@ public class SettingsController {
         openingSavings.setText(amount.get().formatAmount(locale()));
         openingSavingsStatus.getStyleClass().setAll("label", "success");
         openingSavingsStatus.setText(resources.getString("settings.opening-savings.saved"));
+    }
+
+    @FXML
+    private void backupDatabase() {
+        DirectoryChooser chooser = new DirectoryChooser();
+        chooser.setTitle(resources.getString("settings.backup.choose"));
+        File folder = chooser.showDialog(databaseFile.getScene().getWindow());
+        if (folder == null) {
+            return;
+        }
+        try {
+            Path backup = window.backup().to(folder.toPath());
+            backupStatus.getStyleClass().setAll("label", "success");
+            backupStatus.setText(MessageFormat.format(resources.getString("settings.backup.done"), backup));
+        } catch (RuntimeException e) {
+            backupStatus.getStyleClass().setAll("label", "danger");
+            backupStatus.setText(MessageFormat.format(resources.getString("settings.backup.error"), e.getMessage()));
+        }
     }
 
     private Locale locale() {

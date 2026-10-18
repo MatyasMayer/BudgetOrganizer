@@ -6,8 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /** The SQLite file {@code budget.db}, migrated to the latest schema when opened. */
 public final class Database {
@@ -16,6 +19,8 @@ public final class Database {
 
     /** System property overriding the data directory, so development runs don't touch the real data. */
     public static final String DATA_DIR_PROPERTY = "budget.dataDir";
+
+    private static final DateTimeFormatter BACKUP_STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
     private final Path file;
 
@@ -50,6 +55,27 @@ public final class Database {
 
     public Path file() {
         return file;
+    }
+
+    /**
+     * Writes a consistent copy of the database to {@code budget-yyyy-MM-dd_HH-mm-ss.db} in the folder (created
+     * if missing) and returns its path. It never overwrites an existing file.
+     */
+    public Path backupTo(Path folder, LocalDateTime now) {
+        Path target = folder.resolve("budget-" + BACKUP_STAMP.format(now) + ".db");
+        try {
+            Files.createDirectories(folder);
+            if (Files.exists(target)) {
+                throw new StorageException("The backup " + target + " already exists", null);
+            }
+            try (Connection connection = connect(); PreparedStatement copy = connection.prepareStatement("VACUUM INTO ?")) {
+                copy.setString(1, target.toString());
+                copy.execute();
+            }
+        } catch (IOException | SQLException e) {
+            throw new StorageException("Cannot back up the database to " + target, e);
+        }
+        return target;
     }
 
     public Connection connect() throws SQLException {
