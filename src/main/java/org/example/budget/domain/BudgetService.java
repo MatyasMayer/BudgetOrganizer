@@ -5,6 +5,7 @@ import org.example.budget.domain.InvalidTransactionException.Problem;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -567,6 +568,30 @@ public class BudgetService {
     }
 
     /**
+     * Changes a Recurring Template. Only occurrences generated from now on use the new details; Transactions
+     * already generated keep their values.
+     */
+    public void editRecurringTemplate(long id, RecurringTemplateDetails details) {
+        if (recurringTemplates.find(id).isEmpty()) {
+            throw new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.UNKNOWN_TEMPLATE);
+        }
+        validate(details);
+        recurringTemplates.update(new RecurringTemplate(id, details), clock.today());
+    }
+
+    /**
+     * Ends a Recurring Template: no occurrences after the end date are generated. Templates are never deleted,
+     * so the Transactions already generated keep their link.
+     */
+    public void endRecurringTemplate(long id, LocalDate endDate) {
+        RecurringTemplateDetails d = recurringTemplates.find(id).orElseThrow(
+                () -> new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.UNKNOWN_TEMPLATE))
+                .details();
+        editRecurringTemplate(id, new RecurringTemplateDetails(d.type(), d.categoryId(), d.amount(), d.note(),
+                d.frequency(), d.dayOfMonth(), d.startDate(), Optional.of(endDate), d.originalAmount()));
+    }
+
+    /**
      * Generates, as Transactions, every occurrence that came due after the template's last generated one (or
      * from its start) up to today. Run on startup and when the date changes. Each template + occurrence date is
      * generated at most once, even if its Transaction was deleted since.
@@ -575,9 +600,9 @@ public class BudgetService {
         LocalDate today = clock.today();
         for (RecurringTemplate template : recurringTemplates.findAll()) {
             RecurringTemplateDetails details = template.details();
-            Optional<LocalDate> last = recurringTemplates.lastOccurrence(template.id());
+            YearMonth firstOpenMonth = firstOpenMonth(template.id());
             for (LocalDate date : details.occurrencesThrough(today)) {
-                if (last.isPresent() && !date.isAfter(last.get())) {
+                if (YearMonth.from(date).isBefore(firstOpenMonth)) {
                     continue;
                 }
                 Optional<TransactionDetails> occurrence = occurrence(details, date);
@@ -588,6 +613,19 @@ public class BudgetService {
                 recurringTemplates.addOccurrence(template.id(), date, generated.id());
             }
         }
+    }
+
+    /**
+     * The earliest Month a template may still generate in: after the Month of its last generated occurrence
+     * (so a Month is never charged twice) and not before the Month it was last edited in (so an edit never
+     * fills in past Months).
+     */
+    private YearMonth firstOpenMonth(long templateId) {
+        YearMonth open = recurringTemplates.lastOccurrence(templateId)
+                .map(last -> YearMonth.from(last).plusMonths(1))
+                .orElse(YearMonth.of(0, 1));
+        Optional<YearMonth> edited = recurringTemplates.lastEdited(templateId).map(YearMonth::from);
+        return edited.filter(open::isBefore).orElse(open);
     }
 
     /**

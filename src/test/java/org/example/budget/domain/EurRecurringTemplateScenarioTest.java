@@ -105,6 +105,37 @@ class EurRecurringTemplateScenarioTest {
                         "Spotify", Frequency.MONTHLY, 5, LocalDate.of(2026, 9, 1), Optional.empty())));
     }
 
+    @Test
+    void editingAEurTemplateKeepsItInEurAndChangesOnlyLaterOccurrences() {
+        RecurringTemplate spotify = service.createRecurringTemplate(spotifyFrom(LocalDate.of(2026, 10, 1)));
+        service.generateDueOccurrences();
+        RecurringTemplateDetails pricier = RecurringTemplateDetails.inForeignCurrency(TransactionType.EXPENSE,
+                subscriptions, eur(1_199), "Spotify", Frequency.MONTHLY, 5, LocalDate.of(2026, 10, 1),
+                Optional.empty());
+
+        service.editRecurringTemplate(spotify.id(), pricier);
+        cnb.publish(Currency.EUR, LocalDate.of(2026, 11, 5), "24.200");
+        today.set(LocalDate.of(2026, 11, 5));
+        service.generateDueOccurrences();
+
+        assertEquals(pricier, service.recurringTemplates().getFirst().details());
+        // 10.99 EUR × 24.325 = 267.33 before the edit; 11.99 EUR × 24.200 = 290.16 after it
+        assertEquals(List.of(Money.ofHalere(29_016), Money.ofHalere(26_733)),
+                service.transactions(TransactionFilter.ALL).stream().map(Transaction::amount).toList());
+    }
+
+    @Test
+    void endingAEurTemplateKeepsItsOriginalAmount() {
+        RecurringTemplate spotify = service.createRecurringTemplate(spotifyFrom(LocalDate.of(2026, 10, 1)));
+
+        service.endRecurringTemplate(spotify.id(), LocalDate.of(2026, 12, 31));
+
+        RecurringTemplateDetails ended = service.recurringTemplates().getFirst().details();
+        assertEquals(Optional.of(eur(1_099)), ended.originalAmount());
+        assertEquals(Currency.EUR, ended.currency());
+        assertEquals(Optional.of(LocalDate.of(2026, 12, 31)), ended.endDate());
+    }
+
     private TransactionDetails spotify(LocalDate date, LocalDate validFor, String rate, long halere) {
         TransactionDetails details = TransactionDetails.converted(date, TransactionType.EXPENSE, subscriptions,
                 new Conversion(eur(1_099), new CnbRate(Currency.EUR, validFor, new java.math.BigDecimal(rate)),

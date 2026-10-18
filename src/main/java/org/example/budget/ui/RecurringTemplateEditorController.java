@@ -24,6 +24,7 @@ import org.example.budget.domain.Frequency;
 import org.example.budget.domain.InvalidRecurringTemplateException;
 import org.example.budget.domain.Money;
 import org.example.budget.domain.OriginalAmount;
+import org.example.budget.domain.RecurringTemplate;
 import org.example.budget.domain.RecurringTemplateDetails;
 import org.example.budget.domain.TransactionType;
 
@@ -37,8 +38,9 @@ import java.util.Optional;
 import java.util.ResourceBundle;
 
 /**
- * The dialog that creates a Recurring Template in CZK or EUR. Only Categories of the chosen type are offered; the
- * day of month and start date default to today. Saving goes through the service, which validates.
+ * The dialog that creates or edits a Recurring Template in CZK or EUR. Only Categories of the chosen type are
+ * offered; for a new template the day of month and start date default to today. Saving goes through the service,
+ * which validates; an edit applies only to occurrences generated from then on.
  */
 public class RecurringTemplateEditorController {
 
@@ -73,6 +75,10 @@ public class RecurringTemplateEditorController {
     private DatePicker endDate;
     @FXML
     private Label error;
+    @FXML
+    private Label editHint;
+
+    private Optional<RecurringTemplate> existing = Optional.empty();
 
     private RecurringTemplateEditorController(BudgetService service, Locale locale) {
         this.service = service;
@@ -81,7 +87,14 @@ public class RecurringTemplateEditorController {
 
     /** Opens the dialog; true when a template was created. */
     public static boolean open(Window owner, BudgetService service, ResourceBundle resources, Locale locale) {
+        return open(owner, service, resources, locale, Optional.empty());
+    }
+
+    /** Opens the dialog to create a template, or to edit the given one; true when it was saved. */
+    public static boolean open(Window owner, BudgetService service, ResourceBundle resources, Locale locale,
+                               Optional<RecurringTemplate> existing) {
         RecurringTemplateEditorController controller = new RecurringTemplateEditorController(service, locale);
+        controller.existing = existing;
         FXMLLoader loader = new FXMLLoader(
                 RecurringTemplateEditorController.class.getResource("view/recurring-template-editor.fxml"),
                 resources);
@@ -95,7 +108,8 @@ public class RecurringTemplateEditorController {
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.initOwner(owner);
-        dialog.setTitle(resources.getString("recurring.editor.title"));
+        dialog.setTitle(resources.getString(existing.isPresent() ? "recurring.editor.title.edit" : "recurring.editor.title"));
+        existing.ifPresent(controller::fill);
         ButtonType save = new ButtonType(resources.getString("editor.save"), ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(save, ButtonType.CANCEL);
         dialog.getDialogPane().setContent(content);
@@ -133,6 +147,27 @@ public class RecurringTemplateEditorController {
         frequency.setValue(Frequency.MONTHLY);
         day.setText(String.valueOf(today.getDayOfMonth()));
         startDate.setValue(today);
+    }
+
+    /** Shows a template's current details for editing. */
+    private void fill(RecurringTemplate template) {
+        RecurringTemplateDetails details = template.details();
+        (details.type() == TransactionType.INCOME ? incomeType : expenseType).setSelected(true);
+        offerCategoriesOf(details.type());
+        category.getItems().stream().filter(c -> c.id() == details.categoryId()).findFirst()
+                .ifPresent(category::setValue);
+        currency.setValue(details.currency());
+        amount.setText(details.originalAmount()
+                .map(original -> Money.ofHalere(original.cents()))
+                .orElse(details.amount())
+                .formatAmount(locale));
+        note.setText(details.note());
+        frequency.setValue(details.frequency());
+        day.setText(String.valueOf(details.dayOfMonth()));
+        startDate.setValue(details.startDate());
+        endDate.setValue(details.endDate().orElse(null));
+        editHint.setVisible(true);
+        editHint.setManaged(true);
     }
 
     private TransactionType type() {
@@ -178,7 +213,11 @@ public class RecurringTemplateEditorController {
                         new OriginalAmount(chosenCurrency, chosenAmount.get().halere()), note.getText(),
                         frequency.getValue(), chosenDay.get(), start.get().get(), end.get());
         try {
-            service.createRecurringTemplate(details);
+            if (existing.isPresent()) {
+                service.editRecurringTemplate(existing.get().id(), details);
+            } else {
+                service.createRecurringTemplate(details);
+            }
             return true;
         } catch (InvalidRecurringTemplateException e) {
             return fail(resources.getString(Messages.recurringProblemKey(e.problem())));

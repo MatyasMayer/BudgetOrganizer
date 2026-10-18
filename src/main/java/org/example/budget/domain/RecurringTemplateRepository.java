@@ -13,6 +13,15 @@ public interface RecurringTemplateRepository {
 
     Optional<RecurringTemplate> find(long id);
 
+    /**
+     * Replaces the details of an existing template and remembers the day of this edit; its generated
+     * occurrences stay as they are.
+     */
+    void update(RecurringTemplate template, LocalDate editedOn);
+
+    /** The day the template was last edited, if ever. */
+    Optional<LocalDate> lastEdited(long templateId);
+
     /** All templates in the order they were added. */
     List<RecurringTemplate> findAll();
 
