@@ -52,7 +52,7 @@ public class TransactionsController {
 
     private Map<Long, Category> categoriesById = Map.of();
     private Set<Long> generatedIds = Set.of();
-    private List<Transaction> shown = List.of();
+    private TransactionFilter currentFilter = TransactionFilter.ALL;
 
     @FXML
     private ResourceBundle resources;
@@ -168,16 +168,16 @@ public class TransactionsController {
 
     @FXML
     private void exportView() {
-        export(shown);
+        export(currentFilter);
     }
 
     @FXML
     private void exportAll() {
-        export(service.transactions(TransactionFilter.ALL));
+        export(TransactionFilter.ALL);
     }
 
     /** Writes the Transactions as a CSV file the user picks: semicolon-separated, UTF-8 with a BOM. */
-    private void export(List<Transaction> transactions) {
+    private void export(TransactionFilter filter) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(resources.getString("transactions.export.choose"));
         chooser.setInitialFileName("transactions.csv");
@@ -186,14 +186,12 @@ public class TransactionsController {
         if (file == null) {
             return;
         }
-        List<String> header = Stream.of("date", "type", "category", "amount", "original", "currency", "rate",
-                        "charged", "savings-funded", "note")
+        List<String> header = TransactionCsv.COLUMN_KEYS.stream()
                 .map(column -> resources.getString("transactions.export.column." + column)).toList();
         try {
-            Files.writeString(file.toPath(), TransactionCsv.render(header, transactions, this::categoryName),
-                    StandardCharsets.UTF_8);
+            Files.writeString(file.toPath(), service.transactionsCsv(filter, header), StandardCharsets.UTF_8);
             new Alert(Alert.AlertType.INFORMATION, MessageFormat.format(
-                    resources.getString("transactions.export.done"), transactions.size(), file), ButtonType.OK)
+                    resources.getString("transactions.export.done"), service.transactions(filter).size(), file), ButtonType.OK)
                     .showAndWait();
         } catch (IOException e) {
             new Alert(Alert.AlertType.ERROR, MessageFormat.format(
@@ -245,7 +243,7 @@ public class TransactionsController {
                 selected(typeFilter),
                 noteSearch.getText());
         List<Transaction> found = service.transactions(filter);
-        shown = found;
+        currentFilter = filter;
         generatedIds = service.generatedTransactionIds();
         table.getItems().setAll(found);
         summary.setText(MessageFormat.format(resources.getString("transactions.count"), found.size()));

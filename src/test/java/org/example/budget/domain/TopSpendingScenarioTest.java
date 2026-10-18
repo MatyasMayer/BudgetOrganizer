@@ -95,8 +95,8 @@ class TopSpendingScenarioTest {
         CategoryRank electronics = top.categories().getFirst();
         assertEquals("ELECTRONICS", electronics.category().name());
         assertEquals(czk(26_000), electronics.total());
-        assertEquals(czk(25_000), electronics.fromSavings());
-        assertTrue(electronics.hasFromSavings());
+        assertEquals(czk(25_000), electronics.savingsFunded());
+        assertTrue(electronics.hasSavingsFunded());
         Transaction pc = top.biggestExpenses().getFirst();
         assertEquals(czk(25_000), pc.amount());
         assertTrue(pc.details().savingsFunded());

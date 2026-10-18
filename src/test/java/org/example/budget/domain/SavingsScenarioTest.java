@@ -91,7 +91,7 @@ class SavingsScenarioTest {
         assertEquals(czk(28_000), service.savings());
         MonthSummary.CategorySpending pc = spending(october, "ELECTRONICS");
         assertEquals(Money.ZERO, pc.total());
-        assertEquals(czk(40_000), pc.fromSavings());
+        assertEquals(czk(40_000), pc.savingsFunded());
         assertEquals(Optional.of(BudgetBarStatus.GREEN), pc.barStatus());
         assertFalse(october.deficit());
     }
@@ -112,7 +112,7 @@ class SavingsScenarioTest {
         MonthSummary.CategorySpending food = spending(service.monthSummary(Month.of(2026, 10)), "FOOD");
 
         assertEquals(czk(500), food.total());
-        assertEquals(czk(3_000), food.fromSavings());
+        assertEquals(czk(3_000), food.savingsFunded());
         assertEquals(czk(3_500), food.spent());
         assertEquals(czk(500), service.monthSummary(Month.of(2026, 10)).expenses());
     }

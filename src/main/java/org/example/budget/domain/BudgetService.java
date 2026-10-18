@@ -7,6 +7,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -18,6 +19,8 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * The Model's public API used by Controllers. The UI never reaches storage directly.
@@ -458,9 +461,9 @@ public class BudgetService {
                 spent.put(total.categoryId(), total.total());
             }
         }
-        Map<Long, Money> fromSavings = new HashMap<>();
+        Map<Long, Money> savingsFunded = new HashMap<>();
         for (CategoryTotal total : transactions.savingsFundedTotals(month)) {
-            fromSavings.put(total.categoryId(), total.total());
+            savingsFunded.put(total.categoryId(), total.total());
             spent.putIfAbsent(total.categoryId(), Money.ZERO);
         }
         effectiveLimits.keySet().forEach(categoryId -> spent.putIfAbsent(categoryId, Money.ZERO));
@@ -468,7 +471,7 @@ public class BudgetService {
         spent.forEach((categoryId, total) -> categories.find(categoryId).ifPresent(category ->
                 byCategory.add(new MonthSummary.CategorySpending(
                         category, total, Optional.ofNullable(effectiveLimits.get(categoryId)),
-                        fromSavings.getOrDefault(categoryId, Money.ZERO)))));
+                        savingsFunded.getOrDefault(categoryId, Money.ZERO)))));
         byCategory.sort(Comparator
                 .comparingLong((MonthSummary.CategorySpending spending) -> spending.spent().halere()).reversed()
                 .thenComparing(spending -> spending.category().name()));
@@ -506,7 +509,7 @@ public class BudgetService {
 
     private Money fromSavingsIncome(Month month) {
         Set<Long> systemCategories = categories(TransactionType.INCOME).stream()
-                .filter(Category::system).map(Category::id).collect(java.util.stream.Collectors.toSet());
+                .filter(Category::system).map(Category::id).collect(Collectors.toSet());
         return transactions.categoryTotals(month).stream()
                 .filter(total -> systemCategories.contains(total.categoryId()))
                 .map(CategoryTotal::total)
@@ -521,12 +524,11 @@ public class BudgetService {
         Map<Month, MonthTotals> totalsByMonth = new HashMap<>();
         transactions.monthTotals().forEach(totals -> totalsByMonth.put(totals.month(), totals));
         List<MonthOfYear> months = new ArrayList<>();
-        for (int value = 1; value <= 12; value++) {
-            Month month = Month.of(year, value);
+        for (Month month : monthsOf(year)) {
             MonthTotals totals = totalsByMonth.getOrDefault(month, new MonthTotals(month, Money.ZERO, Money.ZERO));
-            Money fromSavings = transactions.savingsFundedTotals(month).stream()
+            Money savingsFunded = transactions.savingsFundedTotals(month).stream()
                     .map(CategoryTotal::total).reduce(Money.ZERO, Money::plus);
-            months.add(new MonthOfYear(month, totals.income(), totals.expenses(), fromSavings,
+            months.add(new MonthOfYear(month, totals.income(), totals.expenses(), savingsFunded,
                     isDeficit(month, totals.leftover()),
                     savingsRate(totals.income(), totals.expenses(), fromSavingsIncome(month))));
         }
@@ -542,7 +544,11 @@ public class BudgetService {
 
     /** Top spending for a whole year. */
     public TopSpending topSpending(int year) {
-        return topSpending(java.util.stream.IntStream.rangeClosed(1, 12).mapToObj(value -> Month.of(year, value)).toList());
+        return topSpending(monthsOf(year));
+    }
+
+    private static List<Month> monthsOf(int year) {
+        return IntStream.rangeClosed(1, 12).mapToObj(value -> Month.of(year, value)).toList();
     }
 
     /**
@@ -552,13 +558,13 @@ public class BudgetService {
      */
     private TopSpending topSpending(List<Month> months) {
         Map<Long, Money> totals = new HashMap<>();
-        Map<Long, Money> fromSavings = new HashMap<>();
+        Map<Long, Money> savingsFunded = new HashMap<>();
         List<Transaction> expenses = new ArrayList<>();
         for (Month month : months) {
             for (Transaction transaction : transactions.find(TransactionFilter.ALL.inMonth(month).ofType(TransactionType.EXPENSE))) {
                 totals.merge(transaction.categoryId(), transaction.amount(), Money::plus);
                 if (transaction.details().savingsFunded()) {
-                    fromSavings.merge(transaction.categoryId(), transaction.amount(), Money::plus);
+                    savingsFunded.merge(transaction.categoryId(), transaction.amount(), Money::plus);
                 }
                 if (!transaction.isRefund()) {
                     expenses.add(transaction);
@@ -569,7 +575,7 @@ public class BudgetService {
         totals.forEach((categoryId, total) -> {
             if (total.halere() > 0) {
                 categories.find(categoryId).ifPresent(category -> ranked.add(
-                        new CategoryRank(category, total, fromSavings.getOrDefault(categoryId, Money.ZERO))));
+                        new CategoryRank(category, total, savingsFunded.getOrDefault(categoryId, Money.ZERO))));
             }
         });
         ranked.sort(Comparator.comparingLong((CategoryRank rank) -> rank.total().halere()).reversed()
@@ -578,6 +584,17 @@ public class BudgetService {
                 .thenComparing(Transaction::date, Comparator.reverseOrder())
                 .thenComparingLong(Transaction::id));
         return new TopSpending(ranked, expenses.stream().limit(5).toList());
+    }
+
+    // --- CSV export ---
+
+    /** The Transactions matching the filter as CSV text (see {@link TransactionCsv}), headed by the given titles. */
+    public String transactionsCsv(TransactionFilter filter, List<String> header) {
+        Map<Long, String> names = new HashMap<>();
+        for (TransactionType type : TransactionType.values()) {
+            categories(type).forEach(category -> names.put(category.id(), category.name()));
+        }
+        return TransactionCsv.render(header, transactions(filter), id -> names.getOrDefault(id, ""));
     }
 
     // --- Pace ---
@@ -605,12 +622,8 @@ public class BudgetService {
                 variable.put(total.categoryId(), total.total());
             }
         }
-        Set<Long> generated = recurringTemplates.generatedTransactionIds();
-        for (Transaction transaction : transactions.find(TransactionFilter.ALL.inMonth(month))) {
-            if (transaction.type() == TransactionType.EXPENSE && !transaction.details().savingsFunded()
-                    && generated.contains(transaction.id())) {
-                variable.merge(transaction.categoryId(), transaction.amount().negate(), Money::plus);
-            }
+        for (Transaction transaction : generatedExpenses(month)) {
+            variable.merge(transaction.categoryId(), transaction.amount().negate(), Money::plus);
         }
         Money fixedTotal = sum(fixed.values());
         Money variableTotal = sum(variable.values());
@@ -634,12 +647,8 @@ public class BudgetService {
     /** Each Category's Fixed Spending in the Month: generated occurrences plus those still due after today. */
     private Map<Long, Money> fixedSpending(Month month, LocalDate today) {
         Map<Long, Money> fixed = new HashMap<>();
-        Set<Long> generated = recurringTemplates.generatedTransactionIds();
-        for (Transaction transaction : transactions.find(TransactionFilter.ALL.inMonth(month))) {
-            if (transaction.type() == TransactionType.EXPENSE && !transaction.details().savingsFunded()
-                    && generated.contains(transaction.id())) {
-                fixed.merge(transaction.categoryId(), transaction.amount(), Money::plus);
-            }
+        for (Transaction transaction : generatedExpenses(month)) {
+            fixed.merge(transaction.categoryId(), transaction.amount(), Money::plus);
         }
         for (RecurringTemplate template : recurringTemplates.findAll()) {
             RecurringTemplateDetails details = template.details();
@@ -657,6 +666,14 @@ public class BudgetService {
         return fixed;
     }
 
+    /** The Month's Expenses generated from Recurring Templates, Savings-Funded ones excluded. */
+    private List<Transaction> generatedExpenses(Month month) {
+        Set<Long> generated = recurringTemplates.generatedTransactionIds();
+        return transactions.find(TransactionFilter.ALL.inMonth(month).ofType(TransactionType.EXPENSE)).stream()
+                .filter(transaction -> !transaction.details().savingsFunded() && generated.contains(transaction.id()))
+                .toList();
+    }
+
     /** What one occurrence costs in CZK; a foreign-currency one at the latest known rate, none without a rate. */
     private Optional<Money> occurrenceCost(RecurringTemplateDetails details, LocalDate today) {
         return details.originalAmount()
@@ -664,7 +681,7 @@ public class BudgetService {
                 .orElse(Optional.of(details.amount()));
     }
 
-    private static Money sum(java.util.Collection<Money> amounts) {
+    private static Money sum(Collection<Money> amounts) {
         return amounts.stream().reduce(Money.ZERO, Money::plus);
     }
 
@@ -793,11 +810,10 @@ public class BudgetService {
      * so the Transactions already generated keep their link.
      */
     public void endRecurringTemplate(long id, LocalDate endDate) {
-        RecurringTemplateDetails d = recurringTemplates.find(id).orElseThrow(
+        RecurringTemplateDetails details = recurringTemplates.find(id).orElseThrow(
                 () -> new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.UNKNOWN_TEMPLATE))
                 .details();
-        editRecurringTemplate(id, new RecurringTemplateDetails(d.type(), d.categoryId(), d.amount(), d.note(),
-                d.frequency(), d.dayOfMonth(), d.startDate(), Optional.of(endDate), d.originalAmount()));
+        editRecurringTemplate(id, details.endingOn(endDate));
     }
 
     /**
@@ -878,10 +894,7 @@ public class BudgetService {
             if (details.type() != TransactionType.EXPENSE || details.hasEndedBy(today)) {
                 continue;
             }
-            Optional<Money> perOccurrence = details.originalAmount()
-                    .map(amount -> rateToUse(amount.currency(), today).map(rate -> rate.rate().convert(amount)))
-                    .orElse(Optional.of(details.amount()));
-            perOccurrence.ifPresentOrElse(amount -> priced.add(subscription(template, amount)),
+            occurrenceCost(details, today).ifPresentOrElse(amount -> priced.add(subscription(template, amount)),
                     () -> unpriced.add(template));
         }
         return new SubscriptionOverview(priced, unpriced);

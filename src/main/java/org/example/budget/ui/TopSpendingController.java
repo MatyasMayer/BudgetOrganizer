@@ -125,11 +125,11 @@ public class TopSpendingController {
             Label name = new Label(rank.category().name());
             Label total = amount(rank.total().format(locale));
             table.addRow(row++, muted(position++ + "."), name, total);
-            if (rank.hasFromSavings()) {
-                Label fromSavings = muted(MessageFormat.format(resources.getString("dashboard.from-savings"),
-                        rank.fromSavings().format(locale)));
-                fromSavings.setTooltip(new Tooltip(resources.getString("dashboard.from-savings.hint")));
-                table.add(fromSavings, 1, row++, 2, 1);
+            if (rank.hasSavingsFunded()) {
+                Label savingsFunded = muted(MessageFormat.format(resources.getString("dashboard.from-savings"),
+                        rank.savingsFunded().format(locale)));
+                savingsFunded.setTooltip(new Tooltip(resources.getString("dashboard.from-savings.hint")));
+                table.add(savingsFunded, 1, row++, 2, 1);
             }
         }
         return table;

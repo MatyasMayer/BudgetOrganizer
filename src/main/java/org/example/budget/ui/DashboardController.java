@@ -249,7 +249,7 @@ public class DashboardController {
         int named = fold ? NAMED_SLICES : positive.size();
         for (int i = 0; i < named; i++) {
             CategorySpending item = positive.get(i);
-            String name = item.hasFromSavings()
+            String name = item.hasSavingsFunded()
                     ? MessageFormat.format(resources.getString("dashboard.from-savings.marker"), item.category().name())
                     : item.category().name();
             slices.add(new Slice(name, item.spent()));
@@ -288,12 +288,12 @@ public class DashboardController {
             if (item.limit().isPresent()) {
                 categoryTable.add(budgetBar(item, item.limit().get()), 1, row++, 2, 1);
             }
-            if (item.hasFromSavings()) {
-                Label fromSavings = new Label(MessageFormat.format(resources.getString("dashboard.from-savings"),
-                        item.fromSavings().format(locale)));
-                fromSavings.getStyleClass().add("text-muted");
-                fromSavings.setTooltip(new Tooltip(resources.getString("dashboard.from-savings.hint")));
-                categoryTable.add(fromSavings, 1, row++, 2, 1);
+            if (item.hasSavingsFunded()) {
+                Label savingsFunded = new Label(MessageFormat.format(resources.getString("dashboard.from-savings"),
+                        item.savingsFunded().format(locale)));
+                savingsFunded.getStyleClass().add("text-muted");
+                savingsFunded.setTooltip(new Tooltip(resources.getString("dashboard.from-savings.hint")));
+                categoryTable.add(savingsFunded, 1, row++, 2, 1);
             }
         }
     }

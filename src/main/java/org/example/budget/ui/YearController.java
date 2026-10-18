@@ -146,10 +146,10 @@ public class YearController {
             if (month.leftover().halere() < 0) {
                 leftover.getStyleClass().add("danger");
             }
-            Label fromSavings = amount(new Label(month.fromSavings().halere() == 0
-                    ? "" : month.fromSavings().format(locale)));
-            if (month.fromSavings().halere() != 0) {
-                fromSavings.setTooltip(new Tooltip(resources.getString("year.from-savings.hint")));
+            Label savingsFunded = amount(new Label(month.savingsFunded().halere() == 0
+                    ? "" : month.savingsFunded().format(locale)));
+            if (month.savingsFunded().halere() != 0) {
+                savingsFunded.setTooltip(new Tooltip(resources.getString("year.from-savings.hint")));
             }
             Label marker = new Label();
             if (month.deficit()) {
@@ -159,7 +159,7 @@ public class YearController {
             }
             table.addRow(row++, new Label(month.month().firstDay().format(longMonth)),
                     amount(new Label(month.income().format(locale))), amount(new Label(month.expenses().format(locale))),
-                    leftover, amount(new Label(month.savingsRate().map(this::percent).orElse("-"))), fromSavings,
+                    leftover, amount(new Label(month.savingsRate().map(this::percent).orElse("-"))), savingsFunded,
                     marker);
         }
         return table;

@@ -15,9 +15,13 @@ import java.util.function.LongFunction;
  */
 public final class TransactionCsv {
 
-    public static final int COLUMNS = 10;
+    /** The columns in order; the UI looks up each one's title in the bundle as {@code transactions.export.column.<key>}. */
+    public static final List<String> COLUMN_KEYS = List.of("date", "type", "category", "amount", "original",
+            "currency", "rate", "charged", "savings-funded", "note");
 
-    private static final String BYTE_ORDER_MARK = "﻿";
+    private static final int COLUMNS = COLUMN_KEYS.size();
+
+    private static final String BYTE_ORDER_MARK = "\uFEFF";
     private static final char SEPARATOR = ';';
     private static final String LINE_END = "\r\n";
 
