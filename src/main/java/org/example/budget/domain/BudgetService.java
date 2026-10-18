@@ -653,6 +653,40 @@ public class BudgetService {
         return recurringTemplates.findAll();
     }
 
+    // --- Subscription overview ---
+
+    /**
+     * What each active Subscription (an Expense template that hasn't ended) costs per month and per year in CZK,
+     * plus the grand totals. A foreign-currency template is converted at the latest known ČNB Rate; one with no
+     * rate at all yet is reported as unpriced rather than counted as free.
+     */
+    public SubscriptionOverview subscriptionOverview() {
+        LocalDate today = clock.today();
+        List<Subscription> priced = new ArrayList<>();
+        List<RecurringTemplate> unpriced = new ArrayList<>();
+        for (RecurringTemplate template : recurringTemplates.findAll()) {
+            RecurringTemplateDetails details = template.details();
+            if (details.type() != TransactionType.EXPENSE || details.hasEndedBy(today)) {
+                continue;
+            }
+            Optional<Money> perOccurrence = details.originalAmount()
+                    .map(amount -> rateToUse(amount.currency(), today).map(rate -> rate.rate().convert(amount)))
+                    .orElse(Optional.of(details.amount()));
+            perOccurrence.ifPresentOrElse(amount -> priced.add(subscription(template, amount)),
+                    () -> unpriced.add(template));
+        }
+        return new SubscriptionOverview(priced, unpriced);
+    }
+
+    /** A yearly template counts 1/12 per month (rounded half-up to the haléř), a monthly one ×12 per year. */
+    private static Subscription subscription(RecurringTemplate template, Money perOccurrence) {
+        long halere = perOccurrence.halere();
+        return template.details().frequency() == Frequency.YEARLY
+                ? new Subscription(template, Money.ofHalere(BigDecimal.valueOf(halere)
+                        .divide(BigDecimal.valueOf(12), 0, RoundingMode.HALF_UP).longValueExact()), perOccurrence)
+                : new Subscription(template, perOccurrence, Money.ofHalere(Math.multiplyExact(halere, 12)));
+    }
+
     private void validate(RecurringTemplateDetails details) {
         Category category = categories.find(details.categoryId()).orElseThrow(
                 () -> new InvalidRecurringTemplateException(InvalidRecurringTemplateException.Problem.UNKNOWN_CATEGORY));
