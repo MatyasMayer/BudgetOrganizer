@@ -1,0 +1,24 @@
+/* Year view: Income in the first categorical colour, Expenses in the second. */
+
+.chart-legend-item {
+    -fx-text-fill: -color-fg-default;
+}
+
+.axis {
+    -fx-tick-label-fill: -color-fg-default;
+}
+
+.default-color0.chart-bar, .bar-legend-symbol.default-color0 { -fx-bar-fill: #2a78d6; -fx-background-color: #2a78d6; }
+.default-color1.chart-bar, .bar-legend-symbol.default-color1 { -fx-bar-fill: #d9822b; -fx-background-color: #d9822b; }
+
+.year-totals {
+    -fx-padding: 12 16 12 16;
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 6;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 6;
+}
+
+.year-deficit {
+    -fx-font-weight: bold;
+}

@@ -55,6 +55,9 @@
                     <tooltip><Tooltip text="%dashboard.deficit.hint"/></tooltip>
                 </Label>
             </HBox>
+            <Label fx:id="savingsRate" styleClass="text-muted" visible="false">
+                <tooltip><Tooltip text="%dashboard.savings-rate.hint"/></tooltip>
+            </Label>
         </VBox>
         <VBox styleClass="dashboard-tile" HBox.hgrow="ALWAYS">
             <Label text="%dashboard.savings" styleClass="text-muted">
