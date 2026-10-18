@@ -16,6 +16,8 @@
     <HBox spacing="8" alignment="CENTER_LEFT">
         <Label text="%screen.recurring" styleClass="title-2"/>
         <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="editButton" text="%recurring.edit" onAction="#editSelected"/>
+        <Button fx:id="endButton" text="%recurring.end" onAction="#endSelected"/>
         <Button text="%recurring.new" onAction="#newTemplate" defaultButton="true"/>
     </HBox>
 
@@ -30,6 +32,7 @@
             <TableColumn fx:id="repeatsColumn" text="%recurring.column.repeats" prefWidth="150"/>
             <TableColumn fx:id="startColumn" text="%recurring.column.start" prefWidth="100"/>
             <TableColumn fx:id="endColumn" text="%recurring.column.end" prefWidth="100"/>
+            <TableColumn fx:id="statusColumn" text="%recurring.column.status" prefWidth="90"/>
             <TableColumn fx:id="noteColumn" text="%recurring.column.note" prefWidth="200"/>
         </columns>
     </TableView>

@@ -34,7 +34,9 @@ import java.util.ResourceBundle;
 
 /**
  * The Month dashboard: total Income, Expenses and Leftover of the selected Month, and its Expenses by
- * Category as a pie chart plus a table, where each Category with a Budget Limit gets a coloured progress bar. The view is rebuilt each time the screen is shown, so changes
+ * Category as a pie chart plus a table, where each Category with a Budget Limit gets a coloured progress bar.
+ * Savings-Funded Expenses are part of their Category's slice and row, marked "from Savings". The Savings total
+ * is shown next to the Month's totals. The view is rebuilt each time the screen is shown, so changes
  * made on other screens always appear; changes made from here refresh it straight away.
  */
 public class DashboardController {
@@ -60,6 +62,8 @@ public class DashboardController {
     private Label expensesTotal;
     @FXML
     private Label leftoverTotal;
+    @FXML
+    private Label savingsTotal;
     @FXML
     private Label deficitBadge;
     @FXML
@@ -147,6 +151,12 @@ public class DashboardController {
             leftoverTotal.getStyleClass().add("danger");
         }
         deficitBadge.setVisible(summary.deficit());
+        Money savings = service.savings();
+        savingsTotal.setText(savings.format(locale));
+        savingsTotal.getStyleClass().remove("danger");
+        if (savings.halere() < 0) {
+            savingsTotal.getStyleClass().add("danger");
+        }
         fillDeficits(service.uncoveredDeficits());
 
         List<Slice> slices = slices(summary.expensesByCategory());
@@ -178,18 +188,25 @@ public class DashboardController {
         uncoveredDeficits.setVisible(!deficits.isEmpty());
     }
 
-    /** Positive Category totals, largest first; past the named slots they fold into one slice. */
+    /**
+     * Positive Category totals (Savings-Funded Expenses included), largest first; past the named slots they fold
+     * into one slice. A slice with Savings-Funded Expenses carries the "from Savings" marker.
+     */
     private List<Slice> slices(List<CategorySpending> spending) {
-        List<CategorySpending> positive = spending.stream().filter(s -> s.total().halere() > 0).toList();
+        List<CategorySpending> positive = spending.stream().filter(s -> s.spent().halere() > 0).toList();
         List<Slice> slices = new ArrayList<>();
         boolean fold = positive.size() > NAMED_SLICES + 1;
         int named = fold ? NAMED_SLICES : positive.size();
         for (int i = 0; i < named; i++) {
-            slices.add(new Slice(positive.get(i).category().name(), positive.get(i).total()));
+            CategorySpending item = positive.get(i);
+            String name = item.hasFromSavings()
+                    ? MessageFormat.format(resources.getString("dashboard.from-savings.marker"), item.category().name())
+                    : item.category().name();
+            slices.add(new Slice(name, item.spent()));
         }
         if (fold) {
             Money rest = positive.subList(named, positive.size()).stream()
-                    .map(CategorySpending::total).reduce(Money.ZERO, Money::plus);
+                    .map(CategorySpending::spent).reduce(Money.ZERO, Money::plus);
             slices.add(new Slice(resources.getString("dashboard.other-categories"), rest));
         }
         return slices;
@@ -205,7 +222,7 @@ public class DashboardController {
         int row = 0;
         for (CategorySpending item : spending) {
             Region swatch = new Region();
-            if (item.total().halere() > 0) {
+            if (item.spent().halere() > 0) {
                 swatch.getStyleClass().addAll("category-swatch", "pie-legend-symbol",
                         "default-color" + Math.min(slot++, NAMED_SLICES));
             }
@@ -220,6 +237,13 @@ public class DashboardController {
             categoryTable.addRow(row++, swatch, name, amount);
             if (item.limit().isPresent()) {
                 categoryTable.add(budgetBar(item, item.limit().get()), 1, row++, 2, 1);
+            }
+            if (item.hasFromSavings()) {
+                Label fromSavings = new Label(MessageFormat.format(resources.getString("dashboard.from-savings"),
+                        item.fromSavings().format(locale)));
+                fromSavings.getStyleClass().add("text-muted");
+                fromSavings.setTooltip(new Tooltip(resources.getString("dashboard.from-savings.hint")));
+                categoryTable.add(fromSavings, 1, row++, 2, 1);
             }
         }
     }

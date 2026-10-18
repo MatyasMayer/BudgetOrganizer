@@ -6,7 +6,6 @@ import javafx.stage.Stage;
 import org.example.budget.currency.CnbRateSource;
 import org.example.budget.domain.BudgetService;
 import org.example.budget.domain.Clock;
-import org.example.budget.domain.Language;
 import org.example.budget.storage.Database;
 import org.example.budget.storage.SqliteBudgetLimitRepository;
 import org.example.budget.storage.SqliteCategoryRepository;
@@ -42,12 +41,13 @@ public class BudgetOrganizerApp extends Application {
 
         if (service.isFirstLaunch()) {
             MainWindow.applyTheme(service.theme());
-            Optional<Language> language = FirstLaunchController.open();
-            if (language.isEmpty()) {
+            Optional<FirstLaunchController.Choice> choice = FirstLaunchController.open();
+            if (choice.isEmpty()) {
                 Platform.exit();
                 return;
             }
-            service.completeFirstLaunch(language.get(), Messages.presetCategoryNames());
+            service.setOpeningSavings(choice.get().openingSavings());
+            service.completeFirstLaunch(choice.get().language(), Messages.presetCategoryNames());
         }
 
         service.generateDueOccurrences();

@@ -4,6 +4,8 @@ package org.example.budget.domain;
 public class InvalidRecurringTemplateException extends RuntimeException {
 
     public enum Problem {
+        /** The template to edit or end doesn't exist. */
+        UNKNOWN_TEMPLATE,
         UNKNOWN_CATEGORY,
         CATEGORY_OF_OTHER_TYPE,
         /** A template repeats a payment; a Refund is never recurring, so the amount must be above zero. */

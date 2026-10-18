@@ -3,6 +3,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.RadioButton?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.ToggleGroup?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -18,4 +19,8 @@
         <RadioButton fx:id="english" toggleGroup="$languageGroup"/>
         <RadioButton fx:id="czech" toggleGroup="$languageGroup"/>
     </HBox>
+
+    <Label fx:id="openingSavingsPrompt" wrapText="true"/>
+    <TextField fx:id="openingSavings"/>
+    <Label fx:id="openingSavingsHint" styleClass="text-muted" wrapText="true"/>
 </VBox>

@@ -212,11 +212,17 @@ public class TransactionsController {
         return Optional.ofNullable(box.getValue()).flatMap(Function.identity());
     }
 
-    /** E.g. "Expense", "Refund", or "Expense (recurring)" for one generated from a Recurring Template. */
+    /**
+     * E.g. "Expense", "Refund", "Expense (from Savings)" for a Savings-Funded Expense, or "Expense (recurring)"
+     * for one generated from a Recurring Template.
+     */
     private String typeLabel(Transaction transaction) {
         String type = transaction.isRefund()
                 ? resources.getString("transactions.refund")
                 : resources.getString(Messages.typeKey(transaction.type()));
+        if (transaction.details().savingsFunded()) {
+            type = MessageFormat.format(resources.getString("transactions.from-savings"), type);
+        }
         return generatedIds.contains(transaction.id())
                 ? MessageFormat.format(resources.getString("transactions.generated"), type)
                 : type;

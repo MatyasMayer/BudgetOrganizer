@@ -49,7 +49,7 @@ public class InMemoryTransactionRepository implements TransactionRepository {
             }
             TransactionDetails d = transaction.details();
             return new Transaction(id, new TransactionDetails(
-                    d.date(), d.type(), toCategoryId, d.amount(), d.note(), d.conversion()));
+                    d.date(), d.type(), toCategoryId, d.amount(), d.note(), d.conversion(), d.savingsFunded()));
         });
     }
 
@@ -65,6 +65,9 @@ public class InMemoryTransactionRepository implements TransactionRepository {
     public List<CategoryTotal> categoryTotals(Month month) {
         Map<Long, CategoryTotal> totals = new LinkedHashMap<>();
         for (Transaction transaction : find(TransactionFilter.ALL.inMonth(month))) {
+            if (transaction.details().savingsFunded()) {
+                continue;
+            }
             totals.merge(transaction.categoryId(),
                     new CategoryTotal(transaction.categoryId(), transaction.type(), transaction.amount()),
                     (sum, more) -> new CategoryTotal(sum.categoryId(), sum.type(), sum.total().plus(more.total())));
@@ -76,7 +79,8 @@ public class InMemoryTransactionRepository implements TransactionRepository {
     public List<CategoryTotal> categoryTotals(LocalDate from, LocalDate through) {
         Map<Long, CategoryTotal> totals = new LinkedHashMap<>();
         for (Transaction transaction : transactions.values()) {
-            if (transaction.date().isBefore(from) || transaction.date().isAfter(through)) {
+            if (transaction.date().isBefore(from) || transaction.date().isAfter(through)
+                    || transaction.details().savingsFunded()) {
                 continue;
             }
             totals.merge(transaction.categoryId(),
@@ -90,6 +94,9 @@ public class InMemoryTransactionRepository implements TransactionRepository {
     public List<MonthTotals> monthTotals() {
         Map<Month, MonthTotals> totals = new TreeMap<>();
         for (Transaction transaction : transactions.values()) {
+            if (transaction.details().savingsFunded()) {
+                continue;
+            }
             Month month = Month.of(transaction.date());
             boolean income = transaction.type() == TransactionType.INCOME;
             Money amount = transaction.amount();
@@ -99,5 +106,26 @@ public class InMemoryTransactionRepository implements TransactionRepository {
                             sum.expenses().plus(more.expenses())));
         }
         return List.copyOf(totals.values());
+    }
+
+    @Override
+    public List<CategoryTotal> savingsFundedTotals(Month month) {
+        Map<Long, CategoryTotal> totals = new LinkedHashMap<>();
+        for (Transaction transaction : find(TransactionFilter.ALL.inMonth(month))) {
+            if (transaction.details().savingsFunded()) {
+                totals.merge(transaction.categoryId(),
+                        new CategoryTotal(transaction.categoryId(), transaction.type(), transaction.amount()),
+                        (sum, more) -> new CategoryTotal(sum.categoryId(), sum.type(), sum.total().plus(more.total())));
+            }
+        }
+        return List.copyOf(totals.values());
+    }
+
+    @Override
+    public Money savingsFundedTotal() {
+        return transactions.values().stream()
+                .filter(transaction -> transaction.details().savingsFunded())
+                .map(Transaction::amount)
+                .reduce(Money.ZERO, Money::plus);
     }
 }
